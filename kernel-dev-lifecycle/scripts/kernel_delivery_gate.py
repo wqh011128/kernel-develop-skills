@@ -23,6 +23,16 @@ IR_UPLOAD_TAG_SCOPE = (
   "(package, registered kernel, config, test module, device count). "
   "Internal Pallas/custom-call/HLO phases covered by that item do not need separate tags."
 )
+STRUCTURAL_HLO_OPS = frozenset(
+  {
+    "after-all",
+    "get-tuple-element",
+    "parameter",
+    "tuple",
+  }
+)
+HLO_OPCODE_RE = re.compile(r"\b([a-z][a-z0-9-]*)\(")
+CUSTOM_CALL_TARGET_RE = re.compile(r'custom_call_target="([^"]+)"')
 
 
 def _run(cmd: list[str], cwd: Path, *, name: str | None = None) -> dict:
@@ -77,6 +87,72 @@ def _missing_check(name: str, reason: str) -> dict:
     "stdout_tail": "",
     "stderr_tail": reason,
   }
+
+
+def _audit_hlo_file(path: Path, *, allowed_extra_ops: set[str]) -> dict:
+  text = path.read_text(encoding="utf-8", errors="replace")
+  opcode_counts: dict[str, int] = {}
+  for line in text.splitlines():
+    if " = " not in line:
+      continue
+    rhs = line.split(" = ", 1)[1]
+    match = HLO_OPCODE_RE.search(rhs)
+    if not match:
+      continue
+    opcode = match.group(1)
+    opcode_counts[opcode] = opcode_counts.get(opcode, 0) + 1
+
+  custom_call_count = opcode_counts.pop("custom-call", 0)
+  targets = sorted(CUSTOM_CALL_TARGET_RE.findall(text))
+  unexpected = {
+    opcode: count
+    for opcode, count in sorted(opcode_counts.items())
+    if opcode not in STRUCTURAL_HLO_OPS and opcode not in allowed_extra_ops
+  }
+  return {
+    "path": str(path.resolve()),
+    "custom_call_count": custom_call_count,
+    "custom_call_targets": targets,
+    "non_custom_opcode_counts": dict(sorted(opcode_counts.items())),
+    "unexpected_non_custom_opcode_counts": unexpected,
+  }
+
+
+def _audit_hlo_root(
+  root: Path | None, *, allowed_extra_ops: set[str]
+) -> dict | None:
+  if root is None:
+    return None
+  resolved = root.resolve()
+  files = sorted(resolved.glob("**/*_before_opt.hlo")) if resolved.exists() else []
+  return {
+    "root": str(resolved),
+    "files": [
+      _audit_hlo_file(path, allowed_extra_ops=allowed_extra_ops) for path in files
+    ],
+  }
+
+
+def _compare_hlo_audits(tpu: dict | None, cpu: dict | None) -> list[dict]:
+  if not tpu or not cpu:
+    return []
+  tpu_by_name = {Path(item["path"]).name: item for item in tpu["files"]}
+  cpu_by_name = {Path(item["path"]).name: item for item in cpu["files"]}
+  comparisons = []
+  for name in sorted(set(tpu_by_name) & set(cpu_by_name)):
+    tpu_item = tpu_by_name[name]
+    cpu_item = cpu_by_name[name]
+    count_match = tpu_item["custom_call_count"] == cpu_item["custom_call_count"]
+    targets_match = tpu_item["custom_call_targets"] == cpu_item["custom_call_targets"]
+    comparisons.append(
+      {
+        "filename": name,
+        "custom_call_count_match": count_match,
+        "custom_call_targets_match": targets_match,
+        "status": "pass" if count_match and targets_match else "fail",
+      }
+    )
+  return comparisons
 
 
 def _workflow_run_commands(path: str, text: str) -> list[dict[str, str]]:
@@ -247,6 +323,15 @@ def main() -> None:
   parser.add_argument(
     "--ir-upload-tag",
     help="Override the generated IR-upload tag for the CPU dump command.",
+  )
+  parser.add_argument(
+    "--allow-extra-hlo-op",
+    action="append",
+    default=[],
+    help=(
+      "Acknowledge one intentional non-structural outer HLO opcode. Repeat for "
+      "multiple opcodes; unacknowledged opcodes block delivery."
+    ),
   )
   parser.add_argument("--pr-text", type=Path, help="PR body or commit message to audit")
   parser.add_argument("--commit-message", type=Path, help="Draft commit message to validate")
@@ -541,6 +626,42 @@ def main() -> None:
       )
       if not payload["artifacts"]["cpu_dump_files"]:
         blockers.append("CPU golden/HLO dump directory is empty or was not inspectable")
+  allowed_extra_ops = set(args.allow_extra_hlo_op)
+  tpu_hlo_audit = _audit_hlo_root(
+    args.snapshot_root, allowed_extra_ops=allowed_extra_ops
+  )
+  cpu_hlo_audit = _audit_hlo_root(
+    args.cpu_dump_out, allowed_extra_ops=allowed_extra_ops
+  )
+  hlo_comparisons = _compare_hlo_audits(tpu_hlo_audit, cpu_hlo_audit)
+  payload["hlo_audit"] = {
+    "structural_opcodes": sorted(STRUCTURAL_HLO_OPS),
+    "acknowledged_extra_opcodes": sorted(allowed_extra_ops),
+    "tpu_snapshot": tpu_hlo_audit,
+    "cpu_dump": cpu_hlo_audit,
+    "same_name_comparisons": hlo_comparisons,
+  }
+  for source_name, audit in (
+    ("TPU snapshot", tpu_hlo_audit),
+    ("CPU dump", cpu_hlo_audit),
+  ):
+    if audit is None:
+      continue
+    if not audit["files"]:
+      blockers.append(f"{source_name} contains no *_before_opt.hlo files to audit")
+    for item in audit["files"]:
+      if item["custom_call_count"] == 0:
+        blockers.append(f"{item['path']} contains zero custom calls")
+      if item["unexpected_non_custom_opcode_counts"]:
+        blockers.append(
+          f"{item['path']} contains unacknowledged non-custom HLO ops: "
+          f"{item['unexpected_non_custom_opcode_counts']}"
+        )
+  for comparison in hlo_comparisons:
+    if comparison["status"] != "pass":
+      blockers.append(
+        "TPU/CPU HLO custom-call mismatch for " + comparison["filename"]
+      )
   if failures:
     blockers.append("One or more delivery commands failed")
   commit_message = payload.get("commit_message")

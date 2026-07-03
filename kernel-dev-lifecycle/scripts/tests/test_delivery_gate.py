@@ -209,7 +209,16 @@ JIRA: COMPIL-123
             snapshot = root / "snapshot"
             snapshot.mkdir()
             for phase in ("permute", "routes_to_token_major", "reduce"):
-                (snapshot / f"{phase}_before_opt.hlo").write_text(phase, encoding="utf-8")
+                (snapshot / f"{phase}_before_opt.hlo").write_text(
+                    f"""HloModule {phase}
+
+ENTRY main {{
+  p0 = bf16[8] parameter(0)
+  ROOT result = bf16[8] custom-call(p0), custom_call_target="tpu_custom_call"
+}}
+""",
+                    encoding="utf-8",
+                )
 
             completed = subprocess.run(
                 [
@@ -239,6 +248,59 @@ JIRA: COMPIL-123
                 "[ir-upload package=kernels kernel=moe_permute_combine "
                 "config=moe_permute_combine test=test_moe_permute_combine device_num=1]",
             )
+
+    def test_hlo_audit_reports_custom_calls_and_outer_ops(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            hlo = Path(temp) / "sample_before_opt.hlo"
+            hlo.write_text(
+                """HloModule sample
+
+ENTRY main {
+  p0 = bf16[8]{0} parameter(0)
+  reshaped = bf16[8]{0} reshape(p0)
+  ROOT result = bf16[8]{0} custom-call(reshaped), custom_call_target="tpu_custom_call"
+}
+""",
+                encoding="utf-8",
+            )
+
+            audit = GATE._audit_hlo_file(hlo, allowed_extra_ops=set())
+
+            self.assertEqual(audit["custom_call_count"], 1)
+            self.assertEqual(audit["custom_call_targets"], ["tpu_custom_call"])
+            self.assertEqual(audit["non_custom_opcode_counts"], {"parameter": 1, "reshape": 1})
+            self.assertEqual(audit["unexpected_non_custom_opcode_counts"], {"reshape": 1})
+
+            acknowledged = GATE._audit_hlo_file(
+                hlo, allowed_extra_ops={"reshape"}
+            )
+            self.assertEqual(acknowledged["unexpected_non_custom_opcode_counts"], {})
+
+    def test_hlo_audit_compares_same_named_tpu_and_cpu_dumps(self) -> None:
+        tpu = {
+            "files": [
+                {
+                    "path": "/tpu/sample_before_opt.hlo",
+                    "custom_call_count": 2,
+                    "custom_call_targets": ["a", "b"],
+                }
+            ]
+        }
+        cpu = {
+            "files": [
+                {
+                    "path": "/cpu/sample_before_opt.hlo",
+                    "custom_call_count": 1,
+                    "custom_call_targets": ["a"],
+                }
+            ]
+        }
+
+        comparisons = GATE._compare_hlo_audits(tpu, cpu)
+
+        self.assertEqual(comparisons[0]["status"], "fail")
+        self.assertFalse(comparisons[0]["custom_call_count_match"])
+        self.assertFalse(comparisons[0]["custom_call_targets_match"])
 
 
 if __name__ == "__main__":

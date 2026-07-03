@@ -46,6 +46,7 @@ Do not create a seven-document workspace for `quick`. Preserve legacy workspaces
 repository contract not reviewed -> no repository edit
 operator semantics or trusted reference unresolved -> no optimization
 correctness failing -> no performance conclusion
+HLO custom-call audit missing or unexplained outer HLO ops present -> do not report completion
 measurement policy or baseline unstable -> no speedup claim
 experiment not reproducible -> do not accept it as current best
 research budget exhausted -> do not start another experiment
@@ -70,6 +71,14 @@ the repository CI does not discover them automatically:
    and record whether strict validation passed. The commit may be the current pre-change HEAD;
    this command is an artifact-generation contract, not permission to commit.
 4. Ruff check and format, followed by `pre-commit run --all-files`.
+5. HLO audit: inspect every TPU snapshot and CPU dump `*_before_opt.hlo`. Record
+   the custom-call count and `custom_call_target` values, enumerate every outer
+   HLO opcode other than `custom-call`, and compare same-named TPU/CPU dumps.
+   Structural opcodes such as `parameter`, `tuple`, and `get-tuple-element` are
+   expected. Any other outer opcode (for example `reshape`, `convert`, `copy`,
+   `dot`, `gather`, or `reduce`) blocks delivery until its exact opcode is
+   explained and explicitly acknowledged with the delivery gate. A zero
+   custom-call count or TPU/CPU count/target mismatch is a blocker.
 
 Use `scripts/kernel_delivery_gate.py` as the mechanical audit and executor. With `--run`, it
 must receive `--tpu-test-file`, `--snapshot-root`, and `--cpu-dump-out`; missing required
@@ -84,8 +93,14 @@ python scripts/kernel_delivery_gate.py --repo <repo> --kernel <kernel> \
   --json-out <delivery-gate.json>
 ```
 
+Use repeatable `--allow-extra-hlo-op <opcode>` only after inspecting the
+reported instruction and recording why it is an intentional wrapper-level
+operation. The gate JSON's `hlo_audit` section is the authoritative HLO report.
+
 The gate JSON is the authoritative feedback artifact. The handoff must summarize every check
 with its exact command, return code, stdout/stderr tail, artifact path, and pass/fail status.
+It must also report each HLO file's custom-call count/targets and all non-custom
+outer HLO opcodes, including acknowledged ones.
 
 ## 5. Close delivery against the repository contract
 
