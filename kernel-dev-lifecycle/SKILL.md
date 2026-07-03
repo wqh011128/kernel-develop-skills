@@ -74,8 +74,16 @@ Before declaring the work complete:
 
 The handoff must include the delivery ledger, exact CPU and accelerator commands, local CI results, tag decisions, the validated commit-message draft with a JIRA reminder, and whether the worktree remains uncommitted.
 
-## 6. Make learning executable
+## 6. Make learning automatic and safe
 
-After an understood failure, use `$kernel-foundry` to create a confirmed failure record, compile its candidate guardrail, prove it on the failing replay and a passing control, then add the case to replay evaluation. Do not paste the lesson into several skills.
+Every kernel task ends with a learning checkpoint, even when the task succeeds:
+
+1. Scan the task ledger, failed commands, correctness mismatches, performance regressions, blocked checks, and user corrections.
+2. Classify each lesson as `local` (only this kernel), `candidate` (possibly reusable but not proven), or `confirmed` (reproduced root cause, durable evidence, and a passing control).
+3. For `candidate`, write a machine-readable failure record in the experiment artifact directory; do not change shared skills.
+4. For `confirmed`, use `$kernel-foundry` to promote the record to an executable guardrail, check it on the failing facts and passing control, and add the case to replay evaluation.
+5. Only after replay/eval shows a measurable improvement may a shared skill rule or helper be proposed. Keep the raw failure record, guardrail result, replay result, and proposed diff together.
+
+Do not paste a lesson into several skills, and do not silently edit shared `SKILL.md` files during a kernel task. The automatic part is evidence capture, classification, guardrail/replay compilation, and eval; shared prompt changes remain an explicit, reviewable change.
 
 Report mode, repository contract sources, correctness, claimed performance evidence, per-item Definition of Done status, exact IR-upload tag decisions, uncommitted status and commit-message draft, foundry state/guardrails when used, and unresolved risks.
