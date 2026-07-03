@@ -3,7 +3,7 @@
 
 Copy this file to a TPU host and run it from a shell that sets:
 
-  LIBTPU_INIT_ARGS="--xla_enable_custom_call_region_trace=true --xla_xprof_register_llo_debug_info=true"
+  LIBTPU_INIT_ARGS="--xla_xprof_register_llo_debug_info=true"
 
 The script intentionally imports JAX only after argument parsing and cwd setup.
 """
@@ -19,6 +19,9 @@ import subprocess
 import sys
 import time
 from typing import Any
+
+
+REQUIRED_LIBTPU_FLAGS = ("--xla_xprof_register_llo_debug_info=true",)
 
 
 def _block(tree: Any) -> Any:
@@ -193,22 +196,22 @@ def main() -> None:
   os.chdir(repo)
   sys.path.insert(0, str(repo))
 
+  libtpu_init_args = os.environ.get("LIBTPU_INIT_ARGS", "")
+  missing_flags = [
+      flag for flag in REQUIRED_LIBTPU_FLAGS if flag not in libtpu_init_args
+  ]
+  if missing_flags:
+    raise SystemExit(
+        "LIBTPU_INIT_ARGS is missing required XProf flags: "
+        + ", ".join(missing_flags)
+    )
+
+  # LIBTPU_INIT_ARGS is parsed when JAX initializes libtpu. Validate the
+  # environment before importing JAX so an actionable gate failure is not
+  # replaced by a backend initialization error.
   import jax  # pylint: disable=import-outside-toplevel
   from pallas_kernels.kernels.config_loader import load_kernel_config  # pylint: disable=import-outside-toplevel
   from pallas_kernels.kernels.registry.lookup import get_kernel  # pylint: disable=import-outside-toplevel
-
-  if "--xla_enable_custom_call_region_trace=true" not in os.environ.get(
-      "LIBTPU_INIT_ARGS", ""
-  ):
-    raise SystemExit(
-        "LIBTPU_INIT_ARGS is missing --xla_enable_custom_call_region_trace=true"
-    )
-  if "--xla_xprof_register_llo_debug_info=true" not in os.environ.get(
-      "LIBTPU_INIT_ARGS", ""
-  ):
-    raise SystemExit(
-        "LIBTPU_INIT_ARGS is missing --xla_xprof_register_llo_debug_info=true"
-    )
 
   cfg = load_kernel_config(args.config)
   runner = get_kernel(args.config, cfg)

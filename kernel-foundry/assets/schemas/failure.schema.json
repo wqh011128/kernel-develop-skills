@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kernel-foundry.local/schemas/failure.schema.json",
+  "title": "Confirmed kernel failure",
+  "type": "object",
+  "required": ["id", "title", "status", "scope", "root_cause", "evidence", "reproduction", "prevention"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "title": {"type": "string", "minLength": 1},
+    "status": {"const": "confirmed"},
+    "scope": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+    "root_cause": {"type": "string", "minLength": 1},
+    "evidence": {"type": "array", "minItems": 1, "items": {"type": ["string", "object"]}},
+    "reproduction": {"type": ["string", "object"]},
+    "non_applicable": {"type": "array", "items": {"type": "string"}},
+    "prevention": {
+      "type": "object",
+      "required": ["guardrail"],
+      "properties": {"guardrail": {"$ref": "guardrail-registry.schema.json#/$defs/guardrail"}}
+    }
+  },
+  "additionalProperties": true
+}

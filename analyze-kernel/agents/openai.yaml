@@ -1,0 +1,4 @@
+interface:
+  display_name: "Analyze Kernel"
+  short_description: "Diagnose kernel evidence and bottlenecks"
+  default_prompt: "Use $analyze-kernel to validate this kernel claim and identify the next falsifying performance check."

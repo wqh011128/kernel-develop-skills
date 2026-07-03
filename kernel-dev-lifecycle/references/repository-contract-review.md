@@ -38,14 +38,17 @@ Review 结论必须引用文件/行、影响和验证方式。没有发现时也
 
 ```text
 git diff --check
-pre-commit changed files
-Ruff
+GitHub workflow inventory and applicable local equivalents
+pre-commit all files
+Ruff lint and configured format checks
 typing helper 或 Mypy
+unit tests required by CI
 config validator
 正确性测试
 snapshot before_opt 且无 error log
 IR upload tag
+commit message: type[SCOPE], Task, Solution, Test, JIRA placeholder reminder
 仓库内无 profile/IR 生成物
 ```
 
-不要把 `test_all.py` 的 exit code 等同于 snapshot 成功；单独检查工件。
+不要把 `test_all.py` 的 exit code 等同于 snapshot 成功；单独检查工件。脚本只能复现已识别的通用 CI surface，agent 仍须逐项阅读 workflow/AGENTS 并运行项目特有命令。

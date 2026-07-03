@@ -10,13 +10,18 @@ Use this reference when validating whether XProf is displaying correct FLOPs for
 
 ## Custom-call visibility flags
 
-`docs/custom_call_profiling.md` requires:
+Use the compatible default below for current JAX/libtpu environments:
 
 ```shell
-LIBTPU_INIT_ARGS="--xla_enable_custom_call_region_trace=true --xla_xprof_register_llo_debug_info=true"
+LIBTPU_INIT_ARGS="--xla_xprof_register_llo_debug_info=true"
 ```
 
-The first flag enables custom-call region tracing. The second registers LLO debug information so Trace Viewer can show custom-call utilization details.
+This flag registers LLO debug information so Trace Viewer can show custom-call
+utilization details. Older environments may also support
+`--xla_enable_custom_call_region_trace=true`, but current libtpu builds can
+reject that flag as unknown and terminate before profiling begins. Treat legacy
+flags as opt-in capabilities: probe them in the target environment before use,
+and never put an unverified flag in the default batch path.
 
 ## Programmatic JAX capture
 
@@ -135,7 +140,7 @@ same `model_flops_v2`/manual-model validation.
 
 - Run a remote preflight before online profiling unless `--skip-preflight` is
   passed. The preflight checks SSH command execution, repo path, required
-  custom-call trace flags, JAX TPU visibility, package versions, registry
+  configured XProf flags, JAX TPU visibility, package versions, registry
   imports, config discovery, and git branch/status. It writes
   `<report-stem>_preflight.json`.
 - Prefer detailed `op_profile` custom-call rows over aggregate `name=custom-call` rows.

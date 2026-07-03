@@ -1,4 +1,4 @@
 interface:
   display_name: "Kernel Goal Discovery"
-  short_description: "Clarify kernel goals before implementation"
-  default_prompt: "Use $kernel-goal-discovery to research a requested kernel and ask for the final implementation goal before coding."
+  short_description: "Resolve material kernel contract unknowns"
+  default_prompt: "Use $kernel-goal-discovery to inspect the real repository and resolve only the kernel decisions that block implementation."

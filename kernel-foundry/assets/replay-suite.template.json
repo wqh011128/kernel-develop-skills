@@ -1,0 +1,82 @@
+{
+  "schema_version": 1,
+  "variants": [
+    "strong_model_no_skill",
+    "strong_model_verbose_skills",
+    "strong_model_thin_skills_executable_gates"
+  ],
+  "cases": [
+    {
+      "id": "matmul-new-kernel",
+      "category": "matmul",
+      "risk": "incorrect tiling or padding",
+      "success_signal": "correct implementation with comparable baseline evidence"
+    },
+    {
+      "id": "attention-mask-boundary",
+      "category": "attention",
+      "risk": "causal or padding mask semantic error",
+      "success_signal": "counterexample found or boundary matrix passes"
+    },
+    {
+      "id": "reduction-non-divisible-shape",
+      "category": "reduction",
+      "risk": "tail elements affect normalization",
+      "success_signal": "non-divisible shapes are tested against an independent oracle"
+    },
+    {
+      "id": "distributed-ring-state",
+      "category": "distributed",
+      "risk": "rank visibility or state lifetime error",
+      "success_signal": "global-to-rank equivalence and communication ordering are validated"
+    },
+    {
+      "id": "backward-accumulation",
+      "category": "backward",
+      "risk": "missing or duplicated gradient accumulation",
+      "success_signal": "gradient oracle and accumulation edge cases pass"
+    },
+    {
+      "id": "fp8-special-values",
+      "category": "low-precision",
+      "risk": "rounding, saturation, NaN, or accumulator mismatch",
+      "success_signal": "dtype policy and adversarial values are covered"
+    },
+    {
+      "id": "wrong-reference-shared-bug",
+      "category": "oracle-integrity",
+      "risk": "candidate and reference share the same semantic error",
+      "success_signal": "optimization stops and an independent/metamorphic oracle is introduced"
+    },
+    {
+      "id": "custom-call-win-full-device-loss",
+      "category": "performance-conclusion",
+      "risk": "local speedup hides collective/copy/control regression",
+      "success_signal": "performance claim is rejected by executable guardrail"
+    },
+    {
+      "id": "missing-or-unread-agents",
+      "category": "repository-contract",
+      "risk": "agent edits without reading the authoritative remote contract",
+      "success_signal": "repository edit stops and the missing contract is reported"
+    },
+    {
+      "id": "snapshot-error-log",
+      "category": "delivery",
+      "risk": "IR upload declared ready with missing HLO or error log",
+      "success_signal": "delivery gate blocks the claim"
+    },
+    {
+      "id": "identical-zero-output",
+      "category": "correctness-helper",
+      "risk": "cosine metric rejects identical all-zero outputs",
+      "success_signal": "identical zero tensors pass while one-sided zero fails"
+    },
+    {
+      "id": "xprof-command-success-missing-run",
+      "category": "profile-integrity",
+      "risk": "process success is mistaken for a visible usable profile",
+      "success_signal": "profile remains partial until xplane and UI run visibility pass"
+    }
+  ]
+}

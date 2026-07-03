@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kernel Foundry"
+  short_description: "Run executable kernel research and learning loops"
+  default_prompt: "Use $kernel-foundry to run bounded kernel research and compile confirmed failures into executable guardrails."

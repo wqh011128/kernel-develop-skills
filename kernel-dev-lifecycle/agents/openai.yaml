@@ -1,4 +1,4 @@
 interface:
   display_name: "Kernel Dev Lifecycle"
-  short_description: "End-to-end kernel development workflow"
-  default_prompt: "Use $kernel-dev-lifecycle to drive a kernel from goal discovery through design, implementation, profiling, and tuning."
+  short_description: "Route and close kernel work against repository CI"
+  default_prompt: "Use $kernel-dev-lifecycle to select the smallest safe workflow and close this kernel task against AGENTS.md, GitHub CI, IR upload, and commit-message gates."

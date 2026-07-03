@@ -1,0 +1,32 @@
+{
+  "id": "replace-with-stable-failure-id",
+  "title": "Short reusable failure title",
+  "status": "confirmed",
+  "scope": ["performance"],
+  "root_cause": "Confirmed minimal root cause, not the symptom.",
+  "evidence": ["path/to/durable/failing/artifact.json"],
+  "reproduction": "path/to/replay-or-deterministic-command",
+  "non_applicable": ["State when this lesson must not fire."],
+  "prevention": {
+    "guardrail": {
+      "id": "replace-with-guardrail-id",
+      "description": "Executable invariant learned from the failure.",
+      "scope": ["performance"],
+      "when": [
+        {
+          "path": "candidate.custom_call_ms",
+          "op": "lt",
+          "other_path": "baseline.custom_call_ms"
+        }
+      ],
+      "assertions": [
+        {
+          "path": "candidate.full_device_ms",
+          "op": "le",
+          "other_path": "baseline.full_device_ms"
+        }
+      ],
+      "action": "reject_performance_claim"
+    }
+  }
+}

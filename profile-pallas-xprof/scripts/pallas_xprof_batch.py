@@ -30,10 +30,7 @@ from typing import Any
 SCRIPT_DIR = Path(__file__).resolve().parent
 RUNNER = SCRIPT_DIR / "pallas_xprof_registry_runner.py"
 TOOLS = SCRIPT_DIR / "xprof_pallas_tools.py"
-LIBTPU_FLAGS = (
-    "--xla_enable_custom_call_region_trace=true "
-    "--xla_xprof_register_llo_debug_info=true"
-)
+LIBTPU_FLAGS = "--xla_xprof_register_llo_debug_info=true"
 
 
 def _ssh_base(args: argparse.Namespace) -> list[str]:
@@ -146,7 +143,6 @@ import subprocess
 import sys
 
 required_flags = [
-    "--xla_enable_custom_call_region_trace=true",
     "--xla_xprof_register_llo_debug_info=true",
 ]
 out = {
@@ -309,8 +305,10 @@ def _safe_extract(tar_path: Path, dest: Path) -> None:
   dest = dest.resolve()
   with tarfile.open(tar_path, "r:gz") as tf:
     for member in tf.getmembers():
+      if member.issym() or member.islnk():
+        raise RuntimeError(f"unsafe tar link member: {member.name}")
       target = (dest / member.name).resolve()
-      if not str(target).startswith(str(dest)):
+      if target != dest and dest not in target.parents:
         raise RuntimeError(f"unsafe tar member path: {member.name}")
     try:
       tf.extractall(dest, filter="data")

@@ -1,81 +1,20 @@
 ---
 name: kernel-goal-discovery
-description: "Research and clarify a requested kernel before implementation. Use when a developer asks to implement, port, optimize, or design any kernel, especially JAX/Pallas/TPU/GPU kernels. Search official docs, papers, current repository code, and existing implementations, then ask the user in Chinese to confirm the final goal before coding."
+description: "Resolve only the material unknowns before implementing or optimizing a JAX/Pallas/TPU/GPU kernel. Use when operator semantics, target workload, shapes, dtypes, reference, tolerance, hardware, performance objective, memory limits, or integration scope are unclear. Reads the real repository contract first and produces a compact confirmed/inferred/unknown operator contract."
 ---
 
 # Kernel Goal Discovery
 
-Before external research, locate the repository root, read every applicable `AGENTS.md`, confirm branch/status, and inspect the current operator, reference, tests, registry/config, and similar kernels. Repository contracts define the implementation boundary and override generic assumptions.
+Do not turn discovery into a fixed questionnaire.
 
-Use this skill when the user wants to write, port, design, or optimize a kernel and the final target is not fully specified.
+1. Read applicable `AGENTS.md`, current operator/reference/tests/configs, call sites, and similar kernels in the actual checkout.
+2. Use official framework/backend documentation and papers only for facts not established by the repository. Cite external sources when used.
+3. Produce a compact contract with three labels: `confirmed`, `inferred`, and `unknown`.
+4. Cover only material fields: formula and masks; target scenario; shape family; input/output/accumulator dtype; trusted oracle and tolerance; hardware/backend; performance objective and baseline; memory/topology constraints; integration and delivery scope.
+5. Ask the user only about unknowns whose alternatives would materially change semantics, architecture, cost, or delivery. State safe defaults for the rest.
 
-## Core Rule
+Do not implement until semantic unknowns and the trusted oracle are resolved. Performance targets may remain provisional if the user explicitly asks for a baseline-first implementation.
 
-Do not start implementation until the final goal is confirmed. First research, then ask concise Chinese confirmation questions.
+Pass the confirmed contract directly to `$kernel-design-docs` for a non-trivial design or `$implement-kernel-from-plan` for a bounded known-pattern change. Do not create documents merely to record facts already authoritative in repository code/tests.
 
-## Research Order
-
-Prefer:
-
-```text
-current repository code, tests, benchmarks, registry, docs
-official framework/backend/hardware documentation
-papers or algorithm notes for semantics and numerical stability
-readable open-source implementations
-RFCs, issues, or PRs only as background, not as proof
-```
-
-If using web sources, cite links in the response. Do not treat a non-official implementation as the only source of truth.
-
-## Final Goal Checklist
-
-Ask the user to confirm:
-
-```text
-1. Operator semantics:
-   formula, masks, causal behavior, broadcasting, layout, padding, boundary cases
-
-2. Target scenario:
-   prefill, decode, training, inference, forward, backward, fused op, or microbenchmark
-
-3. Hardware/backend:
-   TPU/GPU/CPU generation and JAX/Pallas/Triton/CUDA/XLA or other backend
-
-4. Shapes:
-   target shape family, static/dynamic dimensions, edge cases
-
-5. Dtypes and accumulation:
-   input dtype, output dtype, accumulator dtype, quantization or rounding rules
-
-6. Correctness reference and tolerance:
-   dense JAX, existing kernel, official implementation, mathematical oracle, atol/rtol/cosine/relative L2
-
-7. Performance baseline and target:
-   current baseline, target latency, speedup, MFU, bandwidth, memory footprint, or utilization goal
-
-8. Memory constraints:
-   HBM, VMEM/shared/register pressure, spill, padding, workspace, intermediate tensor limits
-
-9. Integration scope:
-   standalone kernel, registry integration, model loop, inference service, autograd, CI
-
-10. Tests, benchmark, and report deliverables:
-    correctness tests, benchmark, XProf, analyze-kernel report, docs, experiment records
-```
-
-## Output Format
-
-Reply in Chinese. Use this structure:
-
-```text
-First state that the goal must be confirmed before implementation.
-Then list researched key facts.
-Then ask the user to confirm the final goal checklist.
-Then state default recommendations and their risks.
-```
-
-If reasonable defaults exist, state them explicitly and explain the risk. If the user says to use defaults, write those defaults into the later design docs.
-
-## Entry To Next Stage
-
-Proceed to `$kernel-design-docs` only after the user confirms the goal or explicitly accepts the defaults.
+Reply in Chinese with confirmed facts, consequential inferences, blocking unknowns, and the next stage.

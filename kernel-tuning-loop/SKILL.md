@@ -1,122 +1,64 @@
 ---
 name: kernel-tuning-loop
-description: "Run a structured kernel tuning loop for JAX/Pallas/TPU/GPU kernels after a trusted reference and initial implementation exist. Coordinates correctness, benchmark, analyze-kernel reports, remote XProf capture, hypothesis-driven optimization, and experiment logging under tmp/{kernel_name}_{date}/experiments/{method_name}/results."
+description: "Test one or more falsifiable JAX/Pallas/TPU/GPU kernel optimizations against a trusted reference and stable baseline. Use for a single evidence-backed change, repeated bounded tuning, communication-overlap feasibility, autonomous research, portfolio exploration, or kernel-genome evaluation. Applies correctness and full-latency gates and uses kernel-foundry state when experiments repeat."
 ---
 
 # Kernel Tuning Loop
 
-Use this skill after a kernel has a trusted reference and an initial implementation. If the reference is not trusted, stop tuning and fix correctness first.
+## Choose one mode
 
-## Required Experiment Results Layout
+| Mode | Use when | State |
+| --- | --- | --- |
+| `single` | One observed bottleneck and one attributable optimization | One experiment record; no research queue |
+| `research` | Two or more hypotheses, genome/portfolio work, or autonomous iteration | Bounded `$kernel-foundry` research state |
 
-Every tuning attempt must write artifacts under one method:
+## Entry gates
 
-```text
-tmp/{kernel_name}_{YYYYMMDD}/experiments/{method_name}/
-  README.md
-  results/
-    benchmark/
-    correctness/
-    xprof/
-    performance/
+Require a confirmed operator contract, independent trusted reference, representative correctness pass, stable baseline, explicit objectives, and comparable measurement policy. Stop and repair the missing gate instead of creating a tuning queue.
+
+## Run one attributable experiment
+
+1. State the observed phenomenon, plausible causes, selected cause, expected metric movement, and rejection condition.
+2. Read only the relevant reference: `attention-kernels.md`, `matmul-kernels.md`, `reduction-kernels.md`, or `elementwise-kernels.md`.
+3. Make the smallest attributable change. Do not combine layout, tile, mask, communication, and dtype changes unless their interaction is the hypothesis.
+4. Run correctness, then the unchanged measurement policy, then XProf only when ambiguity or component timing requires it.
+5. Compare full-device/end-to-end and target-component metrics. Accept, reject, or mark inconclusive with artifacts and complexity trade-offs.
+
+## Start bounded research when experiments repeat
+
+Use `$kernel-foundry` research state with explicit experiment, TPU-hour, and correctness-failure budgets:
+
+```shell
+python <kernel-foundry>/scripts/kernel_foundry.py research init \
+  --state <research.json> --project <kernel> --mode research \
+  --contract <contract-path> --objective full_device_ms:min \
+  --max-experiments <n> --max-tpu-hours <hours> --max-failures <n>
 ```
 
-Do not mix artifacts from different implementation strategies in one folder.
+For every hypothesis, record one expected metric movement and one rejection condition. Use `research add`, `next`, `start`, and `complete`; never mark an experiment accepted when correctness fails. Let `research status` maintain the Pareto frontier.
 
-Use `results/correctness/` for correctness artifacts, `results/benchmark/` for benchmark outputs, `results/xprof/` for XProf captures, and `results/performance/` for analysis reports.
+## Iteration discipline
 
-## Iteration Loop
+1. Diagnose the observed phenomenon and plausible causes.
+2. Test one attributable cause; use one-gene mutations for genome search unless interactions are the hypothesis.
+3. Run correctness before comparable benchmark/profile.
+4. Compare full-device/end-to-end time as well as the target component.
+5. Accept, reject, or mark inconclusive with artifacts and TPU cost.
+6. Stop when the budget is exhausted or no queued hypothesis has a falsifiable expected movement.
 
-Run one focused experiment per iteration:
+Use `$profile-pallas-xprof` for ambiguous, communication-heavy, or sub-millisecond results. Use `$analyze-kernel` for bottleneck interpretation. Use `$kernel-foundry` portfolio, causal, genome, and guardrail commands only after their evidence requirements are met.
 
-1. State one hypothesis and expected metric movement.
-2. Check consensus sources or existing repo patterns when the hypothesis is not already proven by local evidence.
-3. Classify the bottleneck as compute/MXU, HBM, VMEM, communication, launch/control, or mixed.
-4. If the hypothesis depends on communication-compute overlap, ring/pipeline scheduling, async copy, DMA, remote transfer, prefetch, or expression-order tuning, use `$optimize-kernel-from-evidence`, load its overlap references, and run `scripts/overlap_feasibility.py` on C/M/S/O probes before changing the full kernel.
-5. Identify the baseline artifact and target artifact paths.
-6. Make the smallest code change that tests the hypothesis.
-7. Run correctness first.
-8. Run benchmark with the same shape, dtype, warmup, iteration count, and baseline policy.
-   If a single sweep shows a large win for a configuration that should be equivalent to the current default, run a focused repeat before accepting the tuning result.
-9. Capture XProf when wall time is small, communication is involved, or results are ambiguous.
-10. Analyze full time and component time, not only the target custom-call.
-11. Accept, reject, or keep investigating.
-12. Update docs and experiment README in the same turn.
+## Communication-overlap gate
 
-## Required Updates
+For ring/pipeline, async copy, DMA, prefetch, remote transfer, or expression-order claims, read `references/overlap-feasibility.md` and `references/communication-overlap-patterns.md`. Measure compute-only, communication-only, serial, and candidate steps before implementing a full pipeline:
 
-When tuning changes results, update:
-
-```text
-docs/results.md
-docs/optimization.md
-docs/fail-notes.md, if a concise reusable pitfall was found
-experiments/{method_name}/README.md
+```shell
+python scripts/overlap_feasibility.py \
+  --compute-ms <C> --comm-ms <M> --serial-ms <S> --candidate-ms <O> \
+  --full-baseline-ms <baseline> --full-candidate-ms <candidate> \
+  --json-out <overlap.json> --markdown-out <overlap.md>
 ```
 
-Use `results/performance/` for `$analyze-kernel` reports and `results/xprof/` for `$profile-pallas-xprof` artifacts.
+Source order is not execution order. Require profiler or structural evidence, memory-residency feasibility, dependency independence, buffer readiness/ownership, and full-latency improvement. A smaller communication-done event alone is not success.
 
-## Decision Rules
-
-Accept an optimization only when:
-
-```text
-correctness still passes
-the target metric improves against a stable baseline
-full device time does not regress unless the user explicitly accepts the tradeoff
-the result is reproducible enough for the development stage
-the experiment record explains why the change is kept
-```
-
-Reject an optimization when:
-
-```text
-correctness fails
-benchmark movement is noise
-local custom-call speedup is offset by collectives, copies, reshapes, or control overhead
-complexity increases without measurable benefit
-the result depends on an untrusted reference or missing edge-case coverage
-```
-
-For overlap-related work, also reject when:
-
-```text
-T_comm_est > T_compute_est and chunk/tile/communication strategy has not been adjusted
-candidate_overlap_step is equivalent to serial_compute_then_comm
-communication-done is hidden but full latency does not improve
-no-communication multi-step compute is already slower than the baseline
-state round-trip, custom-call fragmentation, copy/layout, or scratch traffic offsets the communication saving
-```
-
-## User-Facing Result
-
-Reply in Chinese. Use a structured result with these fields:
-
-```text
-Conclusion:
-  accepted/rejected/investigating and why
-
-Current hypothesis:
-  one focused hypothesis and expected metric movement
-
-Correctness:
-  pass/fail, command summary, artifact path
-
-Benchmark:
-  key median comparisons, speedup/regression, artifact path
-
-XProf:
-  local URL if running
-  profile artifact path
-  visible/readiness status
-  if UI is not running, exact reason and recovery command/path
-
-Analysis report:
-  analyze-kernel/performance report path
-
-Docs updated:
-  docs and experiment README updated
-
-Next step:
-  next hypothesis with rejection condition
-```
+For `single`, report hypothesis, correctness, comparable evidence, decision, artifacts, and next falsifying check. For `research`, also report budget status, queue, accepted/rejected/inconclusive counts, Pareto frontier, and newly promoted guardrails.

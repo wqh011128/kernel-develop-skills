@@ -1,0 +1,13 @@
+<type>[<SCOPE>]: <imperative summary>
+
+Task:
+- <what problem or requirement this change addresses>
+
+Solution:
+- <how the implementation solves it>
+
+Test:
+- <exact command and result>
+- <required IR-upload tag, when applicable>
+
+JIRA: COMPIL-XXXX

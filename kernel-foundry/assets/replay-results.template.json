@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "results": [
+    {
+      "case_id": "replace-with-suite-case-id",
+      "variant": "strong_model_thin_skills_executable_gates",
+      "metrics": {
+        "success": true,
+        "constraint_violations": 0,
+        "wrong_performance_conclusion": false,
+        "human_corrections": 0,
+        "duration_minutes": 0,
+        "tpu_hours": 0,
+        "documentation_noise": 0,
+        "artifact_completeness": 1,
+        "reproducible": true
+      },
+      "artifacts": []
+    }
+  ]
+}

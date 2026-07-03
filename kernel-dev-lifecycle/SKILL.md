@@ -1,181 +1,80 @@
 ---
 name: kernel-dev-lifecycle
-description: "Orchestrate the full kernel development lifecycle from goal discovery to tuned implementation. Use when building, porting, optimizing, or repeatedly developing JAX/Pallas/TPU/GPU kernels. Enforces tmp/{kernel_name}_{date}/docs plus experiments/{method_name}/results layout, coordinates goal discovery, design docs, implementation, correctness, benchmark, XProf, analysis, and evidence-driven tuning."
+description: "Route JAX/Pallas/TPU/GPU kernel work through the smallest safe workflow. Use for end-to-end kernel implementation, porting, debugging, optimization, or repeated research. Selects quick, standard, or research mode; enforces repository, semantics, correctness, evidence, budget, and delivery gates; delegates executable learning to kernel-foundry."
 ---
 
-# Kernel Dev Lifecycle
+# Kernel Development Lifecycle
 
-Use this as the top-level workflow for kernel development. It coordinates the stage skills; it does not replace them.
+Coordinate the work; do not duplicate stage instructions or force one document layout on every kernel.
 
-## Required Workspace Layout
+## 1. Establish authority
 
-Every kernel project must use this layout unless the user explicitly gives a different root:
+Before research or edits:
+
+1. Locate the actual local or remote kernel checkout.
+2. Read every applicable `AGENTS.md` from repository root to target files.
+3. Inspect branch, dirty status, tests, registry/config, CI, HLO export, IR upload, and delivery conventions.
+4. Treat repository rules as authoritative. Read `references/repository-contract-review.md` only when discovery is unclear.
+5. Build a delivery ledger from every applicable `AGENTS.md` Definition of Done item and every explicit user requirement. Re-read the applicable files after a rebase, branch change, or scope change.
+
+No accessible repository contract means no repository edit. Report what could not be inspected.
+
+## 2. Select one mode
+
+| Mode | Use when | Required process |
+| --- | --- | --- |
+| `quick` | Bounded fix with known semantics and reference | inspect contract, edit, targeted correctness, repository checks |
+| `standard` | New/ported kernel or semantic/API change | confirm operator contract, design only what is uncertain, implement, correctness matrix, benchmark if claimed |
+| `research` | Repeated tuning, competing implementations, portfolio, causal, or genome work | stable baseline plus bounded `kernel-foundry research` state |
+
+Do not create a seven-document workspace for `quick`. Preserve legacy workspaces; do not migrate them mechanically.
+
+## 3. Route only required stages
+
+- Unresolved semantics, shapes, dtype, tolerance, hardware, or integration: use `$kernel-goal-discovery`.
+- A non-trivial semantic or architectural change: use `$kernel-design-docs`.
+- Confirmed contract and implementation request: use `$implement-kernel-from-plan`.
+- Correctness/performance diagnosis: use `$analyze-kernel`; capture with `$profile-pallas-xprof` only when needed.
+- One evidence-backed optimization: use `$kernel-tuning-loop` in `single` mode.
+- Repeated experiments: use `$kernel-tuning-loop` in `research` mode with `$kernel-foundry` state.
+
+## 4. Hard gates
 
 ```text
-tmp/{kernel_name}_{YYYYMMDD}/
-  docs/
-    README.md
-    rfc.md
-    math.md
-    results.md
-    fail-notes.md
-    impl-notes.md
-    optimization.md
-  experiments/
-    {method_name}/
-      code/
-      README.md
-      results/
-        benchmark/
-        correctness/
-        xprof/
-        performance/
+repository contract not reviewed -> no repository edit
+operator semantics or trusted reference unresolved -> no optimization
+correctness failing -> no performance conclusion
+measurement policy or baseline unstable -> no speedup claim
+experiment not reproducible -> do not accept it as current best
+research budget exhausted -> do not start another experiment
+failure root cause unconfirmed -> do not promote a shared guardrail
+applicable AGENTS.md or Definition of Done item unaccounted for -> do not report completion
 ```
 
-Rules:
-
-```text
-kernel_name: lowercase snake_case.
-method_name: descriptive strategy name, such as all_gather_reference, ring_pallas, tiled_streaming.
-README.md: always uppercase.
-Do not create `develop-plan.md` for new work; `rfc.md` includes the development plan.
-No new top-level results/ directory.
-No old numbered docs such as 00-rfc.md or 03-validation-and-profiling.md.
-```
-
-Raw artifacts belong under exactly one `experiments/{method_name}/results/` directory. Top-level docs summarize evidence across experiments; they are not raw-log dumps.
-
-## Stage Order
-
-0. Repository contract: before research or edits, read `references/repository-contract-review.md`; discover every applicable `AGENTS.md`, confirm local/remote branch and dirty status, and record project test/CI/IR-upload rules.
-1. Goal discovery: use `$kernel-goal-discovery`.
-2. Design docs: use `$kernel-design-docs`.
-3. Implementation: use `$implement-kernel-from-plan`.
-4. Correctness, benchmark, XProf, and analysis: use `$analyze-kernel` and `$profile-pallas-xprof` as needed.
-5. Optimization: use `$optimize-kernel-from-evidence` and `$kernel-tuning-loop`. If the design or hypothesis relies on communication-compute overlap, ring/pipeline scheduling, async copy, DMA, remote transfer, prefetch, or expression-order tuning, run the overlap feasibility gate in `$optimize-kernel-from-evidence` before implementing the full pipeline.
-6. Delivery: run `scripts/kernel_delivery_gate.py`, then report implementation status, correctness, benchmark, XProf URL/path, analysis path, IR/snapshot status, accepted/rejected optimizations, and next steps.
-
-## Executable Delivery Gate
-
-Use the bundled script for repeatable mechanical checks:
+Run project-native checks first. Use `scripts/kernel_delivery_gate.py` as a supplemental mechanical audit when its inputs match the repository:
 
 ```shell
-python scripts/kernel_delivery_gate.py \
-  --repo <repo-root> \
-  --kernel <kernel> \
-  --config <config> \
-  --test <correctness-test> \
-  --device-num <n> \
-  --snapshot-root <snapshot-artifacts> \
-  --pr-text <pr-body-or-commit-message> \
-  --run \
-  --json-out <experiment>/results/performance/delivery_gate.json
+python scripts/kernel_delivery_gate.py --repo <repo> --kernel <kernel> \
+  --config <config> --test <test> --snapshot-root <snapshot> \
+  --commit-message <draft.txt> --pr-text <draft.txt> --run \
+  --json-out <delivery-gate.json>
 ```
 
-The script discovers applicable `AGENTS.md`, reports branch/status, checks generated artifacts, runs available pre-commit/Ruff/typing/config commands, validates snapshot artifacts, and prints the IR-upload tag. It does not replace human review of repository constraints.
+## 5. Close delivery against the repository contract
 
-## Hard Gates
+Before declaring the work complete:
 
-Do not proceed past these gates:
+1. Re-read every applicable `AGENTS.md`, then inspect the final diff and worktree status.
+2. Reconcile every delivery-ledger item as `pass`, `not applicable` with a reason, or `blocked`, citing the exact command or artifact. A zero exit code is insufficient when the contract requires inspecting generated snapshots or artifacts.
+3. For kernel-affecting changes, derive the exact IR-upload tag syntax from the repository parser, validator, CI, or documented examples. One tag represents one runnable upload matrix item: package, registered kernel, config, test module, and device count. Internal Pallas calls, custom calls, or HLO phases covered by that same item do not each need a tag. Use one tag only when one config/test invocation covers all phases; emit multiple tags for distinct matrix items.
+4. Include the exact tag or tags in the handoff, even when no PR is being opened.
+5. Inspect `.github/workflows`, pre-commit, Ruff, typing, and test configuration; run every applicable project-native CI command. Treat a missing required tool or an unexecuted applicable CI surface as blocked, not silently skipped.
+6. Leave the worktree uncommitted unless the user separately and explicitly authorizes a commit. For implementation changes, draft a message from `assets/commit_message_template.txt`, fill `type[SCOPE]`, `Task`, `Solution`, and exact `Test` evidence, and include IR-upload tags in a `Test` bullet when required. Use `JIRA: COMPIL-XXXX` only as a placeholder and explicitly remind the user to replace it. Validate the draft with the delivery gate. Drafting text never authorizes `git commit`, push, or PR creation.
 
-```text
-No confirmed goal -> no design or implementation.
-No mathematical derivation -> no kernel implementation.
-No trusted JAX/framework reference -> no optimization.
-Correctness failing -> no performance conclusion.
-No stable baseline -> no speedup claim.
-No device/profile timing for small kernels -> no MFU/utilization conclusion.
-No experiment record -> do not keep an optimization as proven.
-No applicable AGENTS/project contract review -> no repository edits.
-No `*_before_opt.hlo` or any snapshot error log -> IR upload not ready.
-```
+The handoff must include the delivery ledger, exact CPU and accelerator commands, local CI results, tag decisions, the validated commit-message draft with a JIRA reminder, and whether the worktree remains uncommitted.
 
-## Document Update Contract
+## 6. Make learning executable
 
-When adding or changing artifacts, update related docs in the same turn:
+After an understood failure, use `$kernel-foundry` to create a confirmed failure record, compile its candidate guardrail, prove it on the failing replay and a passing control, then add the case to replay evaluation. Do not paste the lesson into several skills.
 
-```text
-Goal or scope change:
-  docs/rfc.md
-  docs/README.md
-
-Plan, ownership, rollout, validation strategy, or acceptance gate change:
-  docs/rfc.md
-  docs/optimization.md, only when the change is driven by experimental evidence
-
-Math, mask, dtype, padding, or equivalence change:
-  docs/math.md
-  docs/impl-notes.md
-
-Implementation change:
-  docs/impl-notes.md
-  experiments/{method_name}/README.md
-
-Correctness, benchmark, XProf, or performance report:
-  docs/results.md
-  experiments/{method_name}/README.md
-
-Optimization decision:
-  docs/optimization.md
-  docs/results.md
-  docs/fail-notes.md, only for concise reusable pitfalls
-```
-
-## Documentation Quality Contract
-
-Every substantial iteration must keep docs coherent, structured, and evidence-linked:
-
-```text
-README.md:
-  update current status, current best, experiment index, and active XProf/report paths.
-
-rfc.md:
-  update only goal/scope/design/task/decision-log level changes.
-
-math.md:
-  update only when semantics, masking, dtype, padding, or equivalence changes.
-
-results.md:
-  summarize correctness, benchmark, XProf, and current-best evidence; do not paste raw logs.
-
-optimization.md:
-  record hypothesis, bottleneck class, evidence, accept/reject decision, and next hypothesis.
-
-impl-notes.md:
-  record API/file/layout/communication/kernel-boundary changes.
-
-fail-notes.md:
-  record concise root causes and what not to repeat; avoid long failure transcripts.
-```
-
-Use Chinese by default. Keep facts, evidence, decisions, and next actions in separate sections. Prefer tables for matrices and short code blocks for metrics, commands, shapes, and paths. Every performance claim must point to an experiment artifact or XProf/analysis report.
-
-## Skill Self-Improvement Boundary
-
-Update general skills only when a lesson is objective, reusable across kernels, and small enough to improve the process without overfitting. Put kernel-specific shapes, numbers, bugs, paths, cluster details, and failed experiment details in the current kernel workspace, not in skills.
-
-At the end of each substantial kernel iteration, run this skill-evolution check:
-
-```text
-1. Identify lessons from docs/results.md, docs/optimization.md, docs/fail-notes.md, XProf reports, and correctness failures.
-2. Classify each lesson as kernel-specific or reusable.
-3. Keep kernel-specific lessons in the current kernel workspace only.
-4. For reusable lessons, patch the smallest relevant skill section instead of rewriting stable content.
-5. Prefer new guardrails, validation gates, artifact fields, or profiling interpretation rules over kernel-specific tuning recipes.
-6. Re-run quick_validate.py for every modified skill.
-7. Report which skill changed and why; if no reusable lesson exists, say no skill update was made.
-```
-
-## User-Facing Output
-
-Reply in Chinese unless the user asks otherwise. For result-related responses, include:
-
-```text
-experiment directory
-benchmark artifact path
-correctness artifact path
-XProf local URL, if running
-XProf artifact path, if available
-kernel analysis report path, if generated
-docs updated
-```
+Report mode, repository contract sources, correctness, claimed performance evidence, per-item Definition of Done status, exact IR-upload tag decisions, uncommitted status and commit-message draft, foundry state/guardrails when used, and unresolved risks.

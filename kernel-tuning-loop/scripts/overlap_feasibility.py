@@ -19,7 +19,7 @@ DECISIONS = {
 
 
 def _speedup(baseline: float | None, candidate: float | None) -> float | None:
-  if baseline is None or candidate is None:
+  if baseline is None or candidate is None or baseline <= 0:
     return None
   return (baseline - candidate) / baseline
 
@@ -65,6 +65,25 @@ def main() -> None:
   parser.add_argument("--json-out", type=Path)
   parser.add_argument("--markdown-out", type=Path)
   args = parser.parse_args()
+
+  measured = {
+    "compute_ms": args.compute_ms,
+    "comm_ms": args.comm_ms,
+    "serial_ms": args.serial_ms,
+    "candidate_ms": args.candidate_ms,
+  }
+  if any(value < 0 for value in measured.values()):
+    parser.error("measured times must be non-negative")
+  for name in ("full_baseline_ms", "full_candidate_ms", "no_comm_multi_step_ms"):
+    value = getattr(args, name)
+    if value is not None and value < 0:
+      parser.error(f"{name.replace('_', '-')} must be non-negative")
+  if args.tolerance < 0:
+    parser.error("tolerance must be non-negative")
+  if args.resident_bytes is not None and args.resident_bytes < 0:
+    parser.error("resident-bytes must be non-negative")
+  if args.memory_budget_bytes is not None and args.memory_budget_bytes < 0:
+    parser.error("memory-budget-bytes must be non-negative")
 
   hidden_ms_raw = args.compute_ms + args.comm_ms - args.candidate_ms
   hidden_capacity = min(args.compute_ms, args.comm_ms)

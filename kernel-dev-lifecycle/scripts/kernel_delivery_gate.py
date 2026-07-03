@@ -6,16 +6,29 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import re
 import shutil
 import subprocess
 
 
 GENERATED_PATTERNS = ("*.xplane.pb", "*.trace.json.gz", "*_before_opt.hlo", "*.tgz")
+COMMIT_TEMPLATE = Path(__file__).resolve().parents[1] / "assets" / "commit_message_template.txt"
+COMMIT_TITLE_RE = re.compile(
+  r"^(feat|fix|perf|refactor|test|docs|build|ci|chore)"
+  r"\[[A-Z][A-Z0-9_-]*\]: [^\s].+$"
+)
+JIRA_RE = re.compile(r"^[A-Z][A-Z0-9]+-(?:\d+|XXXX)$")
+IR_UPLOAD_TAG_SCOPE = (
+  "One tag covers one runnable upload matrix item "
+  "(package, registered kernel, config, test module, device count). "
+  "Internal Pallas/custom-call/HLO phases covered by that item do not need separate tags."
+)
 
 
-def _run(cmd: list[str], cwd: Path) -> dict:
+def _run(cmd: list[str], cwd: Path, *, name: str | None = None) -> dict:
   proc = subprocess.run(cmd, cwd=cwd, text=True, capture_output=True)
   return {
+    "name": name or Path(cmd[0]).name,
     "command": subprocess.list2cmdline(cmd),
     "returncode": proc.returncode,
     "stdout_tail": proc.stdout[-4000:],
@@ -42,6 +55,161 @@ def _find_executable(repo: Path, names: tuple[str, ...]) -> str | None:
   return None
 
 
+def _tool_command(
+  repo: Path,
+  executable: str,
+  module: str,
+  python: str | None,
+) -> list[str] | None:
+  found = _find_executable(repo, (executable,))
+  if found:
+    return [found]
+  if python:
+    return [python, "-m", module]
+  return None
+
+
+def _missing_check(name: str, reason: str) -> dict:
+  return {
+    "name": name,
+    "command": None,
+    "returncode": 127,
+    "stdout_tail": "",
+    "stderr_tail": reason,
+  }
+
+
+def _workflow_run_commands(path: str, text: str) -> list[dict[str, str]]:
+  commands = []
+  lines = text.splitlines()
+  index = 0
+  while index < len(lines):
+    line = lines[index]
+    match = re.match(r"^(?P<indent>\s*)(?:-\s*)?run:\s*(?P<value>.*)$", line)
+    if not match:
+      index += 1
+      continue
+    value = match.group("value").strip()
+    if value.startswith(("|", ">")):
+      base_indent = len(match.group("indent"))
+      block = []
+      index += 1
+      while index < len(lines):
+        candidate = lines[index]
+        if not candidate.strip():
+          block.append("")
+          index += 1
+          continue
+        indent = len(candidate) - len(candidate.lstrip())
+        if indent <= base_indent:
+          break
+        block.append(candidate.strip())
+        index += 1
+      command = "\n".join(block).strip()
+    else:
+      command = value
+      index += 1
+    commands.append({"workflow": path, "command": command})
+  return commands
+
+
+def _discover_ci(repo: Path) -> dict:
+  workflow_root = repo / ".github" / "workflows"
+  workflow_files = sorted(
+    [*workflow_root.glob("*.yml"), *workflow_root.glob("*.yaml")]
+  ) if workflow_root.is_dir() else []
+  sources = list(workflow_files)
+  for path in (repo / ".pre-commit-config.yaml", repo / "pyproject.toml"):
+    if path.is_file():
+      sources.append(path)
+  workflow_text = {
+    path.relative_to(repo).as_posix(): path.read_text(
+      encoding="utf-8", errors="replace"
+    )
+    for path in workflow_files
+  }
+  source_text = "\n".join(
+    path.read_text(encoding="utf-8", errors="replace").lower() for path in sources
+  )
+  run_commands = []
+  for path, text in workflow_text.items():
+    run_commands.extend(_workflow_run_commands(path, text))
+  surfaces = {
+    "pre_commit": (repo / ".pre-commit-config.yaml").is_file()
+    or "pre-commit" in source_text,
+    "ruff_check": "ruff" in source_text,
+    "ruff_format": "ruff format" in source_text or "ruff-format" in source_text,
+    "typing": any(token in source_text for token in ("mypy", "typing_helper", "pyright")),
+    "unit_tests": "pytest" in source_text,
+    "config_validator": (repo / "tools" / "config_validator.py").is_file(),
+  }
+  return {
+    "workflow_files": [path.relative_to(repo).as_posix() for path in workflow_files],
+    "workflow_run_commands": run_commands,
+    "surfaces": surfaces,
+    "note": (
+      "Inventoried every workflow file and run: entry, then detected common local CI "
+      "surfaces. AGENTS.md and workflow-specific commands remain authoritative; each "
+      "inventory item must be reconciled in the delivery ledger."
+    ),
+  }
+
+
+def _validate_commit_message(text: str) -> dict:
+  normalized = text.replace("\r\n", "\n").strip()
+  lines = normalized.splitlines()
+  errors = []
+  warnings = []
+  if not lines or not COMMIT_TITLE_RE.fullmatch(lines[0]):
+    errors.append(
+      "Title must match type[SCOPE]: summary with a supported lowercase type "
+      "and uppercase scope"
+    )
+
+  positions = {}
+  for label in ("Task:", "Solution:", "Test:"):
+    matches = [index for index, line in enumerate(lines) if line == label]
+    if len(matches) != 1:
+      errors.append(f"Expected exactly one {label} section")
+    elif matches:
+      positions[label] = matches[0]
+  jira_lines = [
+    (index, line.removeprefix("JIRA:").strip())
+    for index, line in enumerate(lines)
+    if line.startswith("JIRA:")
+  ]
+  if len(jira_lines) != 1:
+    errors.append("Expected exactly one JIRA: <PROJECT-NUMBER> line")
+  else:
+    _, jira = jira_lines[0]
+    if not JIRA_RE.fullmatch(jira):
+      errors.append("JIRA must look like COMPIL-123 or the draft placeholder COMPIL-XXXX")
+    elif jira.endswith("-XXXX"):
+      warnings.append("Replace the virtual JIRA placeholder COMPIL-XXXX before commit")
+
+  if len(positions) == 3:
+    ordered = [positions[label] for label in ("Task:", "Solution:", "Test:")]
+    if ordered != sorted(ordered):
+      errors.append("Sections must be ordered Task, Solution, Test")
+    jira_index = jira_lines[0][0] if len(jira_lines) == 1 else len(lines)
+    bounds = [ordered[1], ordered[2], jira_index]
+    for label, start, end in zip(("Task:", "Solution:", "Test:"), ordered, bounds):
+      bullets = [line for line in lines[start + 1:end] if line.startswith("- ")]
+      if not bullets or any(len(line[2:].strip()) == 0 for line in bullets):
+        errors.append(f"{label} must contain at least one non-empty bullet")
+
+  body_without_jira = "\n".join(
+    line for line in lines if not line.startswith("JIRA:")
+  )
+  if re.search(r"<[^>]+>", body_without_jira):
+    errors.append("Commit message still contains an unresolved template placeholder")
+  return {
+    "status": "pass" if not errors else "fail",
+    "errors": errors,
+    "warnings": warnings,
+  }
+
+
 def _applicable_agents(repo: Path, changed: list[str]) -> list[str]:
   agents = sorted(repo.rglob("AGENTS.md"))
   applicable = []
@@ -63,6 +231,17 @@ def main() -> None:
   parser.add_argument("--device-num", type=int, default=1)
   parser.add_argument("--snapshot-root", type=Path)
   parser.add_argument("--pr-text", type=Path, help="PR body or commit message to audit")
+  parser.add_argument("--commit-message", type=Path, help="Draft commit message to validate")
+  parser.add_argument(
+    "--write-commit-template",
+    type=Path,
+    help="Copy the bundled commit-message template to this path.",
+  )
+  parser.add_argument(
+    "--allow-missing-commit-message",
+    action="store_true",
+    help="Do not block --run when changes exist but no draft was supplied.",
+  )
   parser.add_argument("--allow-missing-expected", action="store_true")
   parser.add_argument("--run", action="store_true")
   parser.add_argument("--json-out", type=Path)
@@ -72,10 +251,17 @@ def main() -> None:
   if not (repo / ".git").exists():
     raise SystemExit(f"Not a git repository: {repo}")
   config = args.config or args.kernel
-  test = args.test or f"test_{args.kernel}_correctness"
+  test = args.test or f"test_{args.kernel}"
   changed = [line for line in _git(repo, "status", "--porcelain").splitlines() if line]
   changed_files = [line[3:] for line in changed]
   branch = _git(repo, "branch", "--show-current")
+  ci_discovery = _discover_ci(repo)
+
+  if args.write_commit_template:
+    if not COMMIT_TEMPLATE.is_file():
+      raise SystemExit(f"Missing bundled commit-message template: {COMMIT_TEMPLATE}")
+    args.write_commit_template.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(COMMIT_TEMPLATE, args.write_commit_template)
 
   expected = [
     f"pallas_kernels/{args.package}/{args.kernel}.py",
@@ -107,8 +293,22 @@ def main() -> None:
     "expected_files": expected_status,
     "generated_artifacts_in_repo": sorted(set(generated)),
     "ir_upload_tag": ir_tag,
+    "ir_upload_tag_scope": IR_UPLOAD_TAG_SCOPE,
+    "ci_discovery": ci_discovery,
+    "commit_message_template": str(COMMIT_TEMPLATE),
     "checks": [],
   }
+  if args.write_commit_template:
+    payload["commit_message_template_copy"] = str(
+      args.write_commit_template.resolve()
+    )
+  if args.commit_message:
+    commit_text = args.commit_message.read_text(encoding="utf-8")
+    payload["commit_message"] = {
+      "path": str(args.commit_message.resolve()),
+      **_validate_commit_message(commit_text),
+      "ir_upload_tag_present": ir_tag in commit_text,
+    }
   if args.pr_text:
     pr_text = args.pr_text.read_text(encoding="utf-8")
     payload["ir_upload_tag_present"] = ir_tag in pr_text
@@ -122,37 +322,98 @@ def main() -> None:
     }
 
   if args.run:
-    payload["checks"].append(_run(["git", "diff", "--check"], repo))
+    payload["checks"].append(
+      _run(["git", "diff", "--check"], repo, name="git_diff_check")
+    )
     python_files = [path for path in changed_files if path.endswith(".py")]
-    pre_commit = _find_executable(repo, ("pre-commit",))
-    if pre_commit and changed_files:
-      payload["checks"].append(
-        _run([pre_commit, "run", "--files", *changed_files], repo)
-      )
-    ruff = _find_executable(repo, ("ruff",))
-    if ruff and python_files:
-      cmd = [ruff, "check"]
-      ruff_config = repo / ".github" / "workflows" / "ruff.toml"
-      if ruff_config.is_file():
-        cmd.extend(["--config", str(ruff_config)])
-      payload["checks"].append(_run([*cmd, *python_files], repo))
     python = _find_executable(repo, ("python", "python3"))
-    typing_helper = repo / ".ci-shared" / "scripts" / "typing_helper.py"
-    mypy = _find_executable(repo, ("mypy",))
-    if python_files and python and typing_helper.is_file():
-      payload["checks"].append(
-        _run(
-          [python, str(typing_helper), "--changed-files", ",".join(python_files)],
-          repo,
+    surfaces = ci_discovery["surfaces"]
+
+    if surfaces["pre_commit"]:
+      pre_commit = _tool_command(repo, "pre-commit", "pre_commit", python)
+      if pre_commit:
+        payload["checks"].append(
+          _run([*pre_commit, "run", "--all-files"], repo, name="pre_commit_all")
         )
-      )
-    elif python_files and mypy:
-      payload["checks"].append(
-        _run([mypy, "--ignore-missing-imports", *python_files], repo)
-      )
+      else:
+        payload["checks"].append(
+          _missing_check("pre_commit_all", "pre-commit is required by repository CI")
+        )
+
+    if surfaces["ruff_check"]:
+      ruff = _tool_command(repo, "ruff", "ruff", python)
+      if ruff:
+        cmd = [*ruff, "check"]
+      else:
+        cmd = []
+      ruff_config = repo / ".github" / "workflows" / "ruff.toml"
+      if cmd and ruff_config.is_file():
+        cmd.extend(["--config", str(ruff_config)])
+      if cmd:
+        payload["checks"].append(_run([*cmd, "."], repo, name="ruff_check"))
+      else:
+        payload["checks"].append(
+          _missing_check("ruff_check", "Ruff is required by repository CI")
+        )
+      if surfaces["ruff_format"] and ruff:
+        payload["checks"].append(
+          _run([*ruff, "format", "--check", "."], repo, name="ruff_format_check")
+        )
+
+    typing_helper = repo / ".ci-shared" / "scripts" / "typing_helper.py"
+    if surfaces["typing"] and python_files:
+      if python and typing_helper.is_file():
+        payload["checks"].append(
+          _run(
+            [python, str(typing_helper), "--changed-files", ",".join(python_files)],
+            repo,
+            name="typing_helper",
+          )
+        )
+      else:
+        mypy = _tool_command(repo, "mypy", "mypy", python)
+        if mypy:
+          payload["checks"].append(
+            _run([*mypy, *python_files], repo, name="mypy")
+          )
+        else:
+          payload["checks"].append(
+            _missing_check("typing", "Typing is required by repository CI")
+          )
+
+    if surfaces["unit_tests"]:
+      unit_root = repo / "tests" / "unit"
+      if python and unit_root.is_dir():
+        payload["checks"].append(
+          _run(
+            [python, "-m", "pytest", "tests/unit", "-q"],
+            repo,
+            name="unit_tests",
+          )
+        )
+      elif not python:
+        payload["checks"].append(
+          _missing_check("unit_tests", "Python is required for repository unit tests")
+        )
+      else:
+        payload["checks"].append(
+          _missing_check(
+            "unit_tests",
+            "Pytest is required by a workflow, but tests/unit was not found; "
+            "run and record the exact workflow-specific pytest target",
+          )
+        )
+
     validator = repo / "tools" / "config_validator.py"
-    if python and validator.is_file():
-      payload["checks"].append(_run([python, str(validator)], repo))
+    if surfaces["config_validator"]:
+      if python:
+        payload["checks"].append(
+          _run([python, str(validator)], repo, name="config_validator")
+        )
+      else:
+        payload["checks"].append(
+          _missing_check("config_validator", "Python is required for config validation")
+        )
 
   failures = [item for item in payload["checks"] if item["returncode"]]
   snapshot = payload.get("snapshot")
@@ -169,6 +430,18 @@ def main() -> None:
     blockers.append("Snapshot artifacts are missing or contain error logs")
   if failures:
     blockers.append("One or more delivery commands failed")
+  commit_message = payload.get("commit_message")
+  if commit_message:
+    warnings.extend(commit_message["warnings"])
+    if commit_message["status"] != "pass":
+      blockers.append(f"Commit-message draft is invalid: {commit_message['errors']}")
+    if not commit_message["ir_upload_tag_present"]:
+      blockers.append("Required IR-upload tag is missing from the commit-message draft")
+  elif args.run and changed_files and not args.allow_missing_commit_message:
+    blockers.append(
+      "Changed files require a validated commit-message draft; pass --commit-message "
+      "or explicitly use --allow-missing-commit-message"
+    )
   if args.pr_text and not payload["ir_upload_tag_present"]:
     blockers.append("Required IR-upload tag is missing from PR/commit text")
   payload["warnings"] = warnings

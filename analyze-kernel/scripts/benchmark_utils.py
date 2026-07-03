@@ -8,6 +8,10 @@ def bench(fn, warmup=5, iters=20):
 
     fn must return a JAX array (or pytree) supporting block_until_ready().
     """
+    if warmup < 0:
+        raise ValueError("warmup must be non-negative")
+    if iters <= 0:
+        raise ValueError("iters must be positive")
     for _ in range(warmup):
         out = fn()
         out.block_until_ready()
@@ -23,7 +27,11 @@ def bench(fn, warmup=5, iters=20):
 
 def compute_stats(times_ms):
     """Compute summary statistics from a list of times in ms."""
-    t = np.array(times_ms)
+    t = np.asarray(times_ms, dtype=np.float64)
+    if t.size == 0:
+        raise ValueError("times_ms must be non-empty")
+    if not np.isfinite(t).all() or (t < 0).any():
+        raise ValueError("times_ms must contain finite non-negative values")
     return {
         "min": float(t.min()),
         "max": float(t.max()),
