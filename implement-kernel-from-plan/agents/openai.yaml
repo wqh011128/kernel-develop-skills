@@ -1,4 +1,4 @@
 interface:
-  display_name: "Implement Kernel From Contract"
-  short_description: "Implement kernels from confirmed semantic contracts"
-  default_prompt: "Use $implement-kernel-from-plan to implement this kernel from its confirmed contract and trusted oracle."
+  display_name: "按契约实现 Kernel"
+  short_description: "根据已确认语义契约实现 kernel"
+  default_prompt: "使用 $implement-kernel-from-plan 根据已确认契约和可信 oracle 实现这个 kernel。"

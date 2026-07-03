@@ -1,4 +1,4 @@
 interface:
-  display_name: "Kernel Dev Lifecycle"
-  short_description: "Route and close kernel work against repository CI"
-  default_prompt: "Use $kernel-dev-lifecycle to select the smallest safe workflow and close this kernel task against AGENTS.md, GitHub CI, IR upload, and commit-message gates."
+  display_name: "Kernel 开发生命周期"
+  short_description: "按仓库 CI 路由并完成 kernel 交付"
+  default_prompt: "使用 $kernel-dev-lifecycle 选择最小安全流程，并根据 AGENTS.md、GitHub CI、IR 上传和提交信息门禁完成这个 kernel 任务。"

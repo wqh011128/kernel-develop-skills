@@ -1,6 +1,6 @@
 ---
 name: implement-kernel-from-plan
-description: "Implement or modify a JAX/Pallas/TPU/GPU kernel from a confirmed operator contract and trusted validation oracle. Use for bounded fixes, new kernels, ports, or research candidates after material semantic decisions are resolved. Follows the real repository contract, keeps changes attributable, and establishes correctness before performance work."
+description: "根据已确认的算子契约和可信验证 oracle，实现或修改 JAX/Pallas/TPU/GPU kernel。用于边界明确的修复、新 kernel、移植或研究候选；只有关键语义决策确定后才触发。遵循真实仓库约束，保持修改可归因，并先建立正确性再进行性能工作。"
 ---
 
 # Implement Kernel From Contract

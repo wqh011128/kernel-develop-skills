@@ -1,4 +1,4 @@
 interface:
-  display_name: "Profile Pallas XProf"
-  short_description: "Capture and validate remote TPU XProf evidence"
-  default_prompt: "Use $profile-pallas-xprof to capture this kernel profile and report a verified local XProf run or exact recovery steps."
+  display_name: "采集 Pallas XProf"
+  short_description: "采集并验证远程 TPU XProf 证据"
+  default_prompt: "使用 $profile-pallas-xprof 采集这个 kernel 的 profile，并报告已验证的本地 XProf 运行结果或准确恢复步骤。"

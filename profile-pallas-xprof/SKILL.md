@@ -1,6 +1,6 @@
 ---
 name: profile-pallas-xprof
-description: "Capture a remote TPU XProf profile for a JAX/Pallas kernel, download and validate artifacts, open or verify a local XProf UI, and report usable paths and readiness. Use when component timing, communication overlap, short-kernel device timing, or profiler evidence is needed; not as a mandatory step for every kernel change."
+description: "为 JAX/Pallas kernel 采集远程 TPU XProf profile，下载并验证产物，打开或检查本地 XProf UI，并报告可用路径和就绪状态。当需要组件耗时、通信重叠、短 kernel 设备耗时或 profiler 证据时使用；不是每次 kernel 修改的强制步骤。"
 ---
 
 # Profile Pallas With XProf

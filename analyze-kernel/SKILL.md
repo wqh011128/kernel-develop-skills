@@ -1,6 +1,6 @@
 ---
 name: analyze-kernel
-description: "Analyze correctness and performance evidence for JAX/Pallas kernels on TPU/GPU. Use to compare candidates, validate a tuning claim, model FLOPs/bytes/MFU, interpret benchmark or XProf data, rank compute, memory, communication, control, and host bottlenecks, and propose falsifiable next checks. Adapts report depth to available evidence."
+description: "分析 TPU/GPU 上 JAX/Pallas kernel 的正确性与性能证据。用于比较候选实现、验证调优结论、估算 FLOPs/Bytes/MFU、解读 benchmark 或 XProf，并按计算、内存、通信、控制流和主机瓶颈排序，提出可证伪的下一步检查；根据现有证据调整报告深度。"
 ---
 
 # Analyze Kernel Evidence

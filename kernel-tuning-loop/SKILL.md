@@ -1,6 +1,6 @@
 ---
 name: kernel-tuning-loop
-description: "Test one or more falsifiable JAX/Pallas/TPU/GPU kernel optimizations against a trusted reference and stable baseline. Use for a single evidence-backed change, repeated bounded tuning, communication-overlap feasibility, autonomous research, portfolio exploration, or kernel-genome evaluation. Applies correctness and full-latency gates and uses kernel-foundry state when experiments repeat."
+description: "基于可信 reference 和稳定 baseline，验证一个或多个可证伪的 JAX/Pallas/TPU/GPU kernel 优化。用于单次有证据支持的修改、重复调优、通信重叠可行性、自主研究、portfolio 探索或 kernel genome 评估；执行正确性和完整端到端延迟门禁，重复实验时使用 kernel-foundry 状态。"
 ---
 
 # Kernel Tuning Loop

@@ -1,6 +1,6 @@
 ---
 name: kernel-dev-lifecycle
-description: "Route JAX/Pallas/TPU/GPU kernel work through the smallest safe workflow. Use for end-to-end kernel implementation, porting, debugging, optimization, or repeated research. Selects quick, standard, or research mode; enforces repository, semantics, correctness, evidence, budget, and delivery gates; delegates executable learning to kernel-foundry."
+description: "将 JAX/Pallas/TPU/GPU kernel 工作路由到最小且安全的流程。用于端到端实现、移植、调试、优化或重复研究；自动选择 quick、standard 或 research 模式，执行仓库、语义、正确性、证据、预算和交付门禁，并将可执行学习交给 kernel-foundry。"
 ---
 
 # Kernel Development Lifecycle

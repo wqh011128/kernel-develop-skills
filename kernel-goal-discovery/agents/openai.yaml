@@ -1,4 +1,4 @@
 interface:
-  display_name: "Kernel Goal Discovery"
-  short_description: "Resolve material kernel contract unknowns"
-  default_prompt: "Use $kernel-goal-discovery to inspect the real repository and resolve only the kernel decisions that block implementation."
+  display_name: "Kernel 目标发现"
+  short_description: "解决关键 kernel 契约未知项"
+  default_prompt: "使用 $kernel-goal-discovery 检查真实仓库，只解决阻塞 kernel 实现的关键决策。"

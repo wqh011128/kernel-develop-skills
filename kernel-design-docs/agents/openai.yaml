@@ -1,4 +1,4 @@
 interface:
-  display_name: "Kernel Design Records"
-  short_description: "Create kernel RFCs from the required template"
-  default_prompt: "Use $kernel-design-docs to create the minimum durable kernel RFC or semantic record from the applicable template."
+  display_name: "Kernel 设计记录"
+  short_description: "使用规定模板创建 kernel RFC"
+  default_prompt: "使用 $kernel-design-docs 根据适用模板创建最小且持久的 kernel RFC 或语义记录。"

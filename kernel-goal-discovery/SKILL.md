@@ -1,6 +1,6 @@
 ---
 name: kernel-goal-discovery
-description: "Resolve only the material unknowns before implementing or optimizing a JAX/Pallas/TPU/GPU kernel. Use when operator semantics, target workload, shapes, dtypes, reference, tolerance, hardware, performance objective, memory limits, or integration scope are unclear. Reads the real repository contract first and produces a compact confirmed/inferred/unknown operator contract."
+description: "在实现或优化 JAX/Pallas/TPU/GPU kernel 前，只解决会改变方案方向的关键未知项。当算子语义、目标 workload、shape、dtype、reference、容差、硬件、性能目标、内存限制或集成范围不清楚时使用。先读取真实仓库契约，并产出精简的 confirmed/inferred/unknown 算子契约。"
 ---
 
 # Kernel Goal Discovery

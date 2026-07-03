@@ -1,4 +1,4 @@
 interface:
-  display_name: "Kernel Tuning Loop"
-  short_description: "Test single or repeated kernel optimizations"
-  default_prompt: "Use $kernel-tuning-loop to test this kernel optimization with correctness, attribution, full-latency, overlap, and budget gates."
+  display_name: "Kernel 调优闭环"
+  short_description: "验证单次或重复的 kernel 优化"
+  default_prompt: "使用 $kernel-tuning-loop 通过正确性、归因、完整延迟、重叠和预算门禁验证这个 kernel 优化。"

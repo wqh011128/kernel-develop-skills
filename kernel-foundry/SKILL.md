@@ -1,6 +1,6 @@
 ---
 name: kernel-foundry
-description: "Run an evidence-driven kernel engineering system that turns confirmed failures into executable guardrails, fuzzes operator semantics, manages bounded autonomous experiments, builds shape-specific kernel portfolios, analyzes controlled source-to-HLO changes, and proposes traceable kernel-genome mutations. Use for repeated JAX/Pallas/TPU/GPU kernel development where the agent should improve the process from evidence instead of accumulating prompt rules."
+description: "运行证据驱动的 kernel 工程学习系统：将已确认失败转为可执行 guardrail，进行算子语义 fuzz，管理有边界的自主实验，构建按 shape 分发的 kernel portfolio，分析受控 source-to-HLO 变化，并提出可追踪的 kernel genome 变异。用于重复性的 JAX/Pallas/TPU/GPU kernel 开发，让流程从证据中改进，而不是不断堆积提示词规则。"
 ---
 
 # Kernel Foundry

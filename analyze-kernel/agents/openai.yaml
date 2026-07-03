@@ -1,4 +1,4 @@
 interface:
-  display_name: "Analyze Kernel"
-  short_description: "Diagnose kernel evidence and bottlenecks"
-  default_prompt: "Use $analyze-kernel to validate this kernel claim and identify the next falsifying performance check."
+  display_name: "Kernel 证据分析"
+  short_description: "诊断 kernel 证据与性能瓶颈"
+  default_prompt: "使用 $analyze-kernel 验证这个 kernel 结论，并找出下一项可证伪的性能检查。"

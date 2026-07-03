@@ -1,6 +1,6 @@
 ---
 name: kernel-design-docs
-description: "Create the minimum decision and semantic contract needed for a new or changed JAX/Pallas/TPU/GPU kernel. Use after goals are confirmed when math, distributed equivalence, API boundaries, validation, rollout, or competing designs require durable documentation. Adapts to quick, standard, or research mode and preserves existing repository conventions instead of forcing a fixed seven-document package."
+description: "为新建或修改的 JAX/Pallas/TPU/GPU kernel 建立最小必要的决策记录和语义契约。当数学语义、分布式等价性、API 边界、验证、发布或竞争方案需要持久化文档时使用；目标确认后触发。适配 quick、standard、research 模式，遵循已有仓库约定，不强制固定的七文档结构。"
 ---
 
 # Kernel Design Records
