@@ -17,7 +17,7 @@ Before research or edits:
 4. Treat repository rules as authoritative. Read `references/repository-contract-review.md` only when discovery is unclear.
 5. Build a delivery ledger from every applicable `AGENTS.md` Definition of Done item and every explicit user requirement. Re-read the applicable files after a rebase, branch change, or scope change.
 6. For a fresh checkout, read the target repository README and follow its environment setup command exactly. Do not manually install or upgrade dependencies from this skill.
-7. Resolve one artifact directory before any write: use the user's directory when provided; otherwise use `<target-repository-root>/docs/<kernel>/` (for pallaskernel: `pallaskernel/docs/<kernel>/`). RFCs, design docs, failure records, research state, and experiment artifacts use this directory. Never write them into the skills repository.
+7. Resolve one artifact directory before any write: use the user's directory when provided; otherwise use `<kernel>/docs/` inside the target repository. RFCs, design docs, failure records, research state, and experiment artifacts use this directory. Never write them into the skills repository.
 
 No accessible repository contract means no repository edit. Report what could not be inspected.
 

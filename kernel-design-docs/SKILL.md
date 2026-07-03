@@ -12,7 +12,7 @@ Document uncertainty and durable decisions, not the entire workflow.
 Before creating or updating any RFC, design document, failure record, research state, benchmark summary, HLO note, or XProf note, resolve one artifact directory:
 
 1. If the user provides an artifact directory, use that directory for all task artifacts.
-2. Otherwise use `<target-repository-root>/docs/<kernel>/`; for the standard `pallaskernel` checkout this is `pallaskernel/docs/<kernel>/`.
+2. Otherwise use `<kernel>/docs/` inside the target repository; for a kernel named `fused_rmsnorm`, this is `<target-repository-root>/fused_rmsnorm/docs/`.
 3. Create the directory only inside the target kernel repository. Never write task artifacts into this skills repository or into a skill's `references/` or `assets/` directory.
 
 Report the resolved absolute artifact directory before writing. Keep RFCs, design notes, failure records, research state, benchmark summaries, HLO notes, and XProf notes together unless the target repository contract explicitly requires separate locations.
