@@ -345,9 +345,12 @@ only understood failures; include symptom, cause, fix
 
 ## 4. 本 kernel 可复用经验
 short lessons useful for this kernel workspace
+
+## 5. Skill 候选经验
+table: lesson, evidence, scope, generalizable/current-kernel-only, promotion decision
 ```
 
-Do not paste long raw logs here.
+Do not paste long raw logs here. A lesson may be promoted to a skill only when it is supported by backend/API semantics, official/project contracts, or repeated evidence beyond one shape and one implementation. Shape-specific thresholds, paths, one-off compiler failures, and kernel-specific schedules remain in this workspace.
 
 `impl-notes.md`:
 

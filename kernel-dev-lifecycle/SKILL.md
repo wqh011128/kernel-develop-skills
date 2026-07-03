@@ -47,12 +47,32 @@ Raw artifacts belong under exactly one `experiments/{method_name}/results/` dire
 
 ## Stage Order
 
+0. Repository contract: before research or edits, read `references/repository-contract-review.md`; discover every applicable `AGENTS.md`, confirm local/remote branch and dirty status, and record project test/CI/IR-upload rules.
 1. Goal discovery: use `$kernel-goal-discovery`.
 2. Design docs: use `$kernel-design-docs`.
 3. Implementation: use `$implement-kernel-from-plan`.
 4. Correctness, benchmark, XProf, and analysis: use `$analyze-kernel` and `$profile-pallas-xprof` as needed.
-5. Optimization: use `$optimize-kernel-from-evidence` and `$kernel-tuning-loop`.
-6. Delivery: report implementation status, correctness, benchmark, XProf URL/path, analysis path, accepted/rejected optimizations, and next steps.
+5. Optimization: use `$optimize-kernel-from-evidence` and `$kernel-tuning-loop`. If the design or hypothesis relies on communication-compute overlap, ring/pipeline scheduling, async copy, DMA, remote transfer, prefetch, or expression-order tuning, run the overlap feasibility gate in `$optimize-kernel-from-evidence` before implementing the full pipeline.
+6. Delivery: run `scripts/kernel_delivery_gate.py`, then report implementation status, correctness, benchmark, XProf URL/path, analysis path, IR/snapshot status, accepted/rejected optimizations, and next steps.
+
+## Executable Delivery Gate
+
+Use the bundled script for repeatable mechanical checks:
+
+```shell
+python scripts/kernel_delivery_gate.py \
+  --repo <repo-root> \
+  --kernel <kernel> \
+  --config <config> \
+  --test <correctness-test> \
+  --device-num <n> \
+  --snapshot-root <snapshot-artifacts> \
+  --pr-text <pr-body-or-commit-message> \
+  --run \
+  --json-out <experiment>/results/performance/delivery_gate.json
+```
+
+The script discovers applicable `AGENTS.md`, reports branch/status, checks generated artifacts, runs available pre-commit/Ruff/typing/config commands, validates snapshot artifacts, and prints the IR-upload tag. It does not replace human review of repository constraints.
 
 ## Hard Gates
 
@@ -66,6 +86,8 @@ Correctness failing -> no performance conclusion.
 No stable baseline -> no speedup claim.
 No device/profile timing for small kernels -> no MFU/utilization conclusion.
 No experiment record -> do not keep an optimization as proven.
+No applicable AGENTS/project contract review -> no repository edits.
+No `*_before_opt.hlo` or any snapshot error log -> IR upload not ready.
 ```
 
 ## Document Update Contract

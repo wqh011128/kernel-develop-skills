@@ -24,6 +24,8 @@ tmp/{kernel_name}_{YYYYMMDD}/experiments/{method_name}/
 
 Each `method_name` represents one implementation strategy or tuning hypothesis. Store raw artifacts inside that experiment. Summarize cross-experiment conclusions in `docs/results.md` and tuning decisions in `docs/optimization.md`.
 
+This experiment tree is local-only. Do not create or leave `tmp/{kernel_name}_{YYYYMMDD}/...` artifacts in a remote repo checkout. Use remote `/tmp/...` only as disposable scratch and copy required results back locally before keeping or reporting an optimization.
+
 ## Hard Gates
 
 Do not optimize until all gates are true:
@@ -46,16 +48,84 @@ If the reference may be wrong, stop and fix the reference first. Never use a pos
 4. Select the relevant kernel-type tuning reference from `references/` when the kernel category is clear.
 5. Classify the current bottleneck with a roofline-style category: compute/MXU-bound, HBM-bound, VMEM/shared-memory-bound, communication-bound, launch/control-bound, or mixed.
 6. Convert the bottleneck into a phenomenon-driven diagnosis: observed metric, possible causes, next checks, and the one cause this experiment tests.
-7. Identify baseline and target artifact paths.
-8. Make the smallest code change that tests the hypothesis.
-9. Run correctness before benchmark or profile.
-10. Run benchmark with unchanged measurement policy.
-11. Capture XProf when communication is involved, wall time is small, or results are ambiguous.
-12. Compare full time and component time, not only the optimized custom-call.
-13. Accept, reject, or keep investigating based on predefined metrics.
-14. Update experiment README and top-level docs.
+7. If the hypothesis involves communication-compute overlap, ring/pipeline scheduling, async copy, DMA, remote read/write, prefetch, collective ordering, or expression-order tuning, load `references/overlap-feasibility.md` and run its feasibility gate before changing the full kernel.
+8. Identify baseline and target artifact paths.
+9. Make the smallest code change that tests the hypothesis.
+10. Run correctness before benchmark or profile.
+11. Run benchmark with unchanged measurement policy.
+12. Capture XProf when communication is involved, wall time is small, or results are ambiguous.
+13. Compare full time and component time, not only the optimized custom-call.
+14. Accept, reject, or keep investigating based on predefined metrics.
+15. Update experiment README and top-level docs.
 
 Do not combine unrelated changes such as layout, tile size, masking, communication pattern, and dtype policy unless they cannot be separated.
+
+## Communication-Compute Overlap Gate
+
+Use this gate before implementing or modifying any design whose expected speedup depends on hiding communication or data movement under compute.
+
+Trigger examples:
+
+```text
+ring/pipeline/distributed communication overlap
+collective overlap: all-gather, reduce-scatter, all-to-all, ppermute
+send/recv, remote DMA, async copy, prefetch, HBM/VMEM/SRAM movement
+distributed attention, MoE dispatch/combine, matmul or reduction pipelines
+expression-order tuning intended to change overlap
+profile review where communication completion may be hidden or exposed
+```
+
+Required references:
+
+```text
+references/overlap-feasibility.md
+  memory residency, compute window, communication model, overlap inequality, minimal probe, profiler checks, and decision gates
+
+references/communication-overlap-patterns.md
+  warmup/steady/drain, double-buffer ownership, readiness protocol, state lifetime, and reusable failure patterns
+
+references/overlap-report-template.md
+  standard Chinese report structure for overlap analysis
+```
+
+After measuring `compute_only`, `comm_only`, `serial_compute_then_comm`, and `candidate_overlap_step`, run:
+
+```shell
+python scripts/overlap_feasibility.py \
+  --compute-ms <C> --comm-ms <M> --serial-ms <S> --candidate-ms <O> \
+  --full-baseline-ms <baseline> --full-candidate-ms <candidate> \
+  --resident-bytes <bytes> --memory-budget-bytes <bytes> \
+  --json-out <experiment>/results/performance/overlap_feasibility.json \
+  --markdown-out <experiment>/results/performance/overlap_feasibility.md
+```
+
+Use the script decision as the mechanical gate, then validate it against the trace and mathematical dependency graph. Do not override it without recording contrary evidence.
+
+Hard rules:
+
+```text
+Do not implement a full pipeline before memory/FLOPs/bytes/profiler feasibility analysis.
+Source code order is not execution order; verify with profiler traces or structural probes.
+T_comm_est <= T_compute_est is necessary, not sufficient.
+Communication-done becoming smaller is not success unless full device time improves.
+If candidate_overlap_step is equivalent to serial_compute_then_comm, reject expression-order tuning.
+If no-communication multi-step compute is already slower than baseline, communication hiding cannot rescue the structure.
+Account for state lifetime, custom-call boundaries, barriers, copy/layout/materialization, and scratch traffic.
+Keep shape-specific numbers, paths, and one-off failures in the kernel workspace, not in this skill.
+```
+
+Every overlap analysis must end with exactly one decision:
+
+```text
+proceed_to_pipeline_design
+run_structural_breakdown
+change_chunk_or_tile_size
+optimize_state_lifetime
+reject_expression_order_tuning
+keep_current_baseline
+```
+
+Do not write `continue exploring`.
 
 ## Kernel-Type Tuning References
 

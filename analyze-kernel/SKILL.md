@@ -32,6 +32,16 @@ Do not write new reports to a top-level `results/reports/` directory.
 11. Write the report under `results/performance/`.
 12. Update `docs/results.md` and, if a tuning decision changes, `docs/optimization.md`.
 
+Prefer bundled deterministic helpers over ad-hoc analysis code:
+
+```text
+scripts/correctness.py: standard numerical error fields
+scripts/benchmark_utils.py: stable latency summary fields
+scripts/xplane_parser.py: focused raw XPlane extraction when XProf conversion is unavailable
+```
+
+If a helper does not fit the kernel contract, extend it generically or keep the kernel-specific runner in the experiment `code/` directory. Do not add a shape-specific workaround to the skill.
+
 For XProf/Roofline/FLOPs/Bytes/Memory/Trace interpretation, load `references/diagnostic-matrix.md` and use the "phenomenon -> possible causes -> next checks" pattern. Do not jump from a slow median directly to block-size tuning.
 
 ## Required Deep XProf Questions

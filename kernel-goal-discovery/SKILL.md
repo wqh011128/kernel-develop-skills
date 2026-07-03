@@ -5,6 +5,8 @@ description: "Research and clarify a requested kernel before implementation. Use
 
 # Kernel Goal Discovery
 
+Before external research, locate the repository root, read every applicable `AGENTS.md`, confirm branch/status, and inspect the current operator, reference, tests, registry/config, and similar kernels. Repository contracts define the implementation boundary and override generic assumptions.
+
 Use this skill when the user wants to write, port, design, or optimize a kernel and the final target is not fully specified.
 
 ## Core Rule
