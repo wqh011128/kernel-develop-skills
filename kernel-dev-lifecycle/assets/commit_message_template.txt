@@ -1,13 +1,12 @@
-<type>[<SCOPE>]: <imperative summary>
+feat[TOOL]: <imperative summary>
 
 Task:
-- <what problem or requirement this change addresses>
+- <task>
 
 Solution:
-- <how the implementation solves it>
+- <solution>
 
 Test:
 - <exact command and result>
-- <required IR-upload tag, when applicable>
 
 JIRA: COMPIL-XXXX

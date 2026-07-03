@@ -230,6 +230,24 @@ def main() -> None:
   parser.add_argument("--package", default="kernels")
   parser.add_argument("--device-num", type=int, default=1)
   parser.add_argument("--snapshot-root", type=Path)
+  parser.add_argument(
+    "--tpu-test-file",
+    help="Focused TPU test file used by scripts/test_all.py (required with --run).",
+  )
+  parser.add_argument(
+    "--tpu-test-case",
+    default="correctness",
+    help="Test selector passed to scripts/test_all.py (default: correctness).",
+  )
+  parser.add_argument(
+    "--cpu-dump-out",
+    type=Path,
+    help="Output directory for dump_golden_and_hlo_cpu.py (required with --run).",
+  )
+  parser.add_argument(
+    "--ir-upload-tag",
+    help="Override the generated IR-upload tag for the CPU dump command.",
+  )
   parser.add_argument("--pr-text", type=Path, help="PR body or commit message to audit")
   parser.add_argument("--commit-message", type=Path, help="Draft commit message to validate")
   parser.add_argument(
@@ -268,9 +286,15 @@ def main() -> None:
     f"pallas_kernels/configs/{config}.yaml",
     f"tests/{args.package}/test_{args.kernel}.py",
     f"jax_ops/{args.kernel}.py",
-    f"docs/{args.package}/{args.kernel}.md",
   ]
   expected_status = {path: (repo / path).is_file() for path in expected}
+  docs_candidates = [
+    repo / "docs" / args.package / f"{args.kernel}.md",
+    repo / "docs" / f"{args.kernel}.md",
+  ]
+  expected_status["docs/<package-or-root>/" + f"{args.kernel}.md"] = any(
+    path.is_file() for path in docs_candidates
+  )
   tracked = set(_git(repo, "ls-files").splitlines())
   generated = []
   for pattern in GENERATED_PATTERNS:
@@ -322,6 +346,17 @@ def main() -> None:
     }
 
   if args.run:
+    required_inputs = {
+      "tpu_test_file": args.tpu_test_file,
+      "snapshot_root": str(args.snapshot_root) if args.snapshot_root else None,
+      "cpu_dump_out": str(args.cpu_dump_out) if args.cpu_dump_out else None,
+    }
+    payload["required_acceptance_inputs"] = required_inputs
+    missing_inputs = [name for name, value in required_inputs.items() if not value]
+    if missing_inputs:
+      payload.setdefault("input_errors", []).append(
+        "--run requires: " + ", ".join(missing_inputs)
+      )
     payload["checks"].append(
       _run(["git", "diff", "--check"], repo, name="git_diff_check")
     )
@@ -329,36 +364,88 @@ def main() -> None:
     python = _find_executable(repo, ("python", "python3"))
     surfaces = ci_discovery["surfaces"]
 
-    if surfaces["pre_commit"]:
-      pre_commit = _tool_command(repo, "pre-commit", "pre_commit", python)
-      if pre_commit:
-        payload["checks"].append(
-          _run([*pre_commit, "run", "--all-files"], repo, name="pre_commit_all")
-        )
-      else:
-        payload["checks"].append(
-          _missing_check("pre_commit_all", "pre-commit is required by repository CI")
-        )
+    pre_commit = _tool_command(repo, "pre-commit", "pre_commit", python)
+    if pre_commit:
+      payload["checks"].append(
+        _run([*pre_commit, "run", "--all-files"], repo, name="pre_commit_all")
+      )
+    else:
+      payload["checks"].append(
+        _missing_check("pre_commit_all", "pre-commit is a mandatory delivery gate")
+      )
 
-    if surfaces["ruff_check"]:
-      ruff = _tool_command(repo, "ruff", "ruff", python)
-      if ruff:
-        cmd = [*ruff, "check"]
-      else:
-        cmd = []
+    ruff = _tool_command(repo, "ruff", "ruff", python)
+    if ruff:
       ruff_config = repo / ".github" / "workflows" / "ruff.toml"
-      if cmd and ruff_config.is_file():
+      cmd = [*ruff, "check"]
+      if ruff_config.is_file():
         cmd.extend(["--config", str(ruff_config)])
-      if cmd:
-        payload["checks"].append(_run([*cmd, "."], repo, name="ruff_check"))
-      else:
-        payload["checks"].append(
-          _missing_check("ruff_check", "Ruff is required by repository CI")
+      payload["checks"].append(_run([*cmd, "."], repo, name="ruff_check"))
+      format_cmd = [*ruff, "format", "--check"]
+      if ruff_config.is_file():
+        format_cmd.extend(["--config", str(ruff_config)])
+      payload["checks"].append(
+        _run([*format_cmd, "."], repo, name="ruff_format_check")
+      )
+    else:
+      payload["checks"].extend(
+        [
+          _missing_check("ruff_check", "Ruff is a mandatory delivery gate"),
+          _missing_check("ruff_format_check", "Ruff format is a mandatory delivery gate"),
+        ]
+      )
+
+    if python and args.tpu_test_file and args.snapshot_root:
+      payload["checks"].append(
+        _run(
+          [
+            python,
+            "scripts/test_all.py",
+            "-i",
+            args.tpu_test_file,
+            "-o",
+            str(args.snapshot_root),
+            "--snapshot",
+            "-c",
+            args.tpu_test_case,
+          ],
+          repo,
+          name="tpu_correctness_snapshot",
         )
-      if surfaces["ruff_format"] and ruff:
-        payload["checks"].append(
-          _run([*ruff, "format", "--check", "."], repo, name="ruff_format_check")
+      )
+    elif not python:
+      payload["checks"].append(
+        _missing_check("tpu_correctness_snapshot", "Python is required for TPU validation")
+      )
+
+    if python and args.cpu_dump_out:
+      cpu_dump_tag = args.ir_upload_tag or ir_tag
+      payload["cpu_dump"] = {
+        "commit_msg": cpu_dump_tag,
+        "commit": _git(repo, "rev-parse", "HEAD"),
+        "out_dir": str(args.cpu_dump_out.resolve()),
+      }
+      payload["checks"].append(
+        _run(
+          [
+            python,
+            "tools/dump_golden_and_hlo_cpu.py",
+            "--commit-msg",
+            cpu_dump_tag,
+            "--commit",
+            payload["cpu_dump"]["commit"],
+            "--out-dir",
+            str(args.cpu_dump_out),
+            "--strict",
+          ],
+          repo,
+          name="cpu_golden_hlo_dump_strict",
         )
+      )
+    elif not python:
+      payload["checks"].append(
+        _missing_check("cpu_golden_hlo_dump_strict", "Python is required for CPU IR validation")
+      )
 
     typing_helper = repo / ".ci-shared" / "scripts" / "typing_helper.py"
     if surfaces["typing"] and python_files:
@@ -415,6 +502,16 @@ def main() -> None:
           _missing_check("config_validator", "Python is required for config validation")
         )
 
+    # Re-scan artifacts after the mandatory commands have run. The initial inventory
+    # above is useful for read-only audits, but must not make a fresh --run look empty.
+    if args.snapshot_root:
+      root = args.snapshot_root.resolve()
+      payload["snapshot"] = {
+        "root": str(root),
+        "before_opt_count": len(list(root.glob("**/*_before_opt.hlo"))),
+        "error_count": len(list(root.glob("**/*_error.log"))),
+      }
+
   failures = [item for item in payload["checks"] if item["returncode"]]
   snapshot = payload.get("snapshot")
   blockers = []
@@ -428,6 +525,22 @@ def main() -> None:
     blockers.append("Generated profile/IR artifacts exist inside the git repository")
   if snapshot and (snapshot["before_opt_count"] == 0 or snapshot["error_count"]):
     blockers.append("Snapshot artifacts are missing or contain error logs")
+  if args.run:
+    blockers.extend(payload.get("input_errors", []))
+    if args.snapshot_root:
+      snapshot_files = list(args.snapshot_root.resolve().glob("**/*"))
+      payload.setdefault("artifacts", {})["tpu_snapshot_files"] = len(
+        [path for path in snapshot_files if path.is_file()]
+      )
+      if not payload["artifacts"]["tpu_snapshot_files"]:
+        blockers.append("TPU snapshot directory is empty or was not inspectable")
+    if args.cpu_dump_out:
+      cpu_files = list(args.cpu_dump_out.resolve().glob("**/*"))
+      payload.setdefault("artifacts", {})["cpu_dump_files"] = len(
+        [path for path in cpu_files if path.is_file()]
+      )
+      if not payload["artifacts"]["cpu_dump_files"]:
+        blockers.append("CPU golden/HLO dump directory is empty or was not inspectable")
   if failures:
     blockers.append("One or more delivery commands failed")
   commit_message = payload.get("commit_message")
@@ -435,8 +548,6 @@ def main() -> None:
     warnings.extend(commit_message["warnings"])
     if commit_message["status"] != "pass":
       blockers.append(f"Commit-message draft is invalid: {commit_message['errors']}")
-    if not commit_message["ir_upload_tag_present"]:
-      blockers.append("Required IR-upload tag is missing from the commit-message draft")
   elif args.run and changed_files and not args.allow_missing_commit_message:
     blockers.append(
       "Changed files require a validated commit-message draft; pass --commit-message "

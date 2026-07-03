@@ -17,6 +17,12 @@ SPEC.loader.exec_module(GATE)
 
 
 class DeliveryGateTest(unittest.TestCase):
+    def test_bundled_commit_template_uses_required_shape(self) -> None:
+        template = GATE.COMMIT_TEMPLATE.read_text(encoding="utf-8")
+        self.assertTrue(template.startswith("feat[TOOL]: <imperative summary>"))
+        for section in ("Task:\n- ", "Solution:\n- ", "Test:\n- ", "JIRA: COMPIL-XXXX"):
+            self.assertIn(section, template)
+
     def test_commit_message_contract_accepts_real_jira_and_warns_for_placeholder(self) -> None:
         valid = """feat[TOOL]: add IR simulator support
 
@@ -100,7 +106,7 @@ JIRA: COMPIL-123
             self.assertEqual(completed.returncode, 0, completed.stderr)
             self.assertIn("Task:\n", destination.read_text(encoding="utf-8"))
 
-    def test_cli_requires_ir_tag_in_valid_commit_draft(self) -> None:
+    def test_cli_accepts_valid_commit_draft_without_ir_tag(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             repo = Path(temp) / "repo"
             subprocess.run(["git", "init", "-q", str(repo)], check=True)
@@ -135,22 +141,9 @@ JIRA: COMPIL-123
             completed = subprocess.run(
                 command, capture_output=True, text=True, check=False
             )
-            self.assertEqual(completed.returncode, 1)
-            payload = json.loads(completed.stdout)
-            self.assertIn("IR-upload tag is missing", payload["blockers"][0])
-
-            draft.write_text(
-                draft.read_text(encoding="utf-8").replace(
-                    "- Unit tests pass.",
-                    "- Unit tests pass.\n- [ir-upload package=kernels kernel=sample "
-                    "config=sample test=test_sample device_num=1]",
-                ),
-                encoding="utf-8",
-            )
-            completed = subprocess.run(
-                command, capture_output=True, text=True, check=False
-            )
             self.assertEqual(completed.returncode, 0, completed.stdout)
+            payload = json.loads(completed.stdout)
+            self.assertEqual(payload["commit_message"]["status"], "pass")
 
     def test_discovers_root_agents_and_emits_ir_tag(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -181,6 +174,31 @@ JIRA: COMPIL-123
             )
             self.assertIn("one runnable upload matrix item", payload["ir_upload_tag_scope"])
             self.assertEqual(payload["status"], "pass")
+
+    def test_run_requires_all_acceptance_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            repo = Path(temp) / "repo"
+            subprocess.run(["git", "init", "-q", str(repo)], check=True)
+            completed = subprocess.run(
+                [
+                    sys.executable,
+                    str(SCRIPT),
+                    "--repo",
+                    str(repo),
+                    "--kernel",
+                    "sample",
+                    "--run",
+                    "--allow-missing-expected",
+                    "--allow-missing-commit-message",
+                ],
+                capture_output=True,
+                text=True,
+                check=False,
+            )
+            self.assertEqual(completed.returncode, 1)
+            payload = json.loads(completed.stdout)
+            self.assertTrue(any("tpu_test_file" in item for item in payload["blockers"]))
+            self.assertTrue(any("cpu_dump_out" in item for item in payload["blockers"]))
 
     def test_multiple_internal_hlo_phases_still_emit_one_matrix_item_tag(self) -> None:
         with tempfile.TemporaryDirectory() as temp:

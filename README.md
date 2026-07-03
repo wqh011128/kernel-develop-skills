@@ -174,34 +174,50 @@ python kernel-foundry/scripts/kernel_foundry.py <capability> <command> ...
 
 ## 交付门禁
 
-最终验收必须重新读取适用的 `AGENTS.md`，检查最终 diff/worktree，并核对目标仓库的 GitHub workflow、pre-commit、Ruff、typing、tests、配置校验、correctness、HLO/IR artifact 和 IR-upload tag。
+最终验收必须重新读取适用的 `AGENTS.md`，检查最终 diff/worktree，并核对目标仓库的 GitHub workflow、pre-commit、Ruff、typing、tests、配置校验、correctness、HLO/IR artifact 和 IR-upload tag。对 kernel-affecting 变更，correctness、Ruff、pre-commit、TPU snapshot 和 CPU golden/HLO dump 都是强制门禁；未执行或没有可检查产物必须反馈为 blocked。
+
+标准验证命令为：
+
+```shell
+python scripts/test_all.py -i tests/kernels/test_<kernel>.py -o <snapshot-dir> --snapshot -c correctness
+python tools/dump_golden_and_hlo_cpu.py \
+  --commit-msg "[ir-upload kernel=<kernel>]" \
+  --commit "$(git rev-parse HEAD)" \
+  --out-dir <cpu-dump-dir> \
+  --strict
+```
+
+两个命令的退出码、输出目录、归档/HLO/golden 文件都必须在交付报告中反馈。
 
 可使用：
 
 ```shell
 python kernel-dev-lifecycle/scripts/kernel_delivery_gate.py \
   --repo <repo> --kernel <kernel> --config <config> --test <test> \
-  --snapshot-root <snapshot> --commit-message <draft.txt> \
+  --snapshot-root <snapshot> --tpu-test-file tests/kernels/test_<kernel>.py \
+  --cpu-dump-out <cpu-dump-dir> --commit-message <draft.txt> \
   --pr-text <pr-or-squash-message.txt> --run \
   --json-out <delivery-gate.json>
 ```
 
-提交信息草稿必须包含：
+kernel 提交信息草稿必须简洁、使用英文，并包含：
 
 ```text
 feat[TOOL]: <imperative summary>
 
 Task:
-- <任务>
+- <task>
 
 Solution:
-- <方案>
+- <solution>
 
 Test:
-- <精确命令和结果>
+- <exact command and result>
 
 JIRA: COMPIL-XXXX
 ```
+
+IR-upload tag 不放入 commit message，单独在交付报告或 PR metadata 中提供。
 
 `COMPIL-XXXX` 只是占位符，真正提交前必须替换。生成草稿不等于获得 commit 授权。
 

@@ -51,16 +51,41 @@ experiment not reproducible -> do not accept it as current best
 research budget exhausted -> do not start another experiment
 failure root cause unconfirmed -> do not promote a shared guardrail
 applicable AGENTS.md or Definition of Done item unaccounted for -> do not report completion
+required correctness, TPU snapshot, CPU golden/HLO dump, Ruff, or pre-commit command not executed -> do not report completion
+required command failed, produced no inspectable artifact, or was silently skipped -> report blocked
 ```
 
-Run project-native checks first. Use `scripts/kernel_delivery_gate.py` as a supplemental mechanical audit when its inputs match the repository:
+For every kernel-affecting change, the following acceptance surfaces are mandatory, even when
+the repository CI does not discover them automatically:
+
+1. Correctness: run the repository's focused correctness test. For the standard Pallas test
+   layout, use the TPU snapshot command below; if the repository has a different entry point,
+   pass that exact command to the gate and record the replacement.
+2. TPU snapshot: run exactly `python scripts/test_all.py -i <test-file> -o <snapshot-dir>
+   --snapshot -c correctness` (use the repository's Python executable, such as `.venv/bin/python`).
+   Inspect the result directory and archive; a zero exit code without a result is not a pass.
+3. CPU golden/HLO upload contract: run exactly
+   `python tools/dump_golden_and_hlo_cpu.py --commit-msg "<ir-upload tag>" --commit
+   "$(git rev-parse HEAD)" --out-dir <cpu-dump-dir> --strict`. Inspect the generated dump
+   and record whether strict validation passed. The commit may be the current pre-change HEAD;
+   this command is an artifact-generation contract, not permission to commit.
+4. Ruff check and format, followed by `pre-commit run --all-files`.
+
+Use `scripts/kernel_delivery_gate.py` as the mechanical audit and executor. With `--run`, it
+must receive `--tpu-test-file`, `--snapshot-root`, and `--cpu-dump-out`; missing required
+inputs are blockers rather than implicit skips:
 
 ```shell
 python scripts/kernel_delivery_gate.py --repo <repo> --kernel <kernel> \
   --config <config> --test <test> --snapshot-root <snapshot> \
+  --tpu-test-file tests/kernels/test_<kernel>.py \
+  --cpu-dump-out <cpu-dump-dir> \
   --commit-message <draft.txt> --pr-text <draft.txt> --run \
   --json-out <delivery-gate.json>
 ```
+
+The gate JSON is the authoritative feedback artifact. The handoff must summarize every check
+with its exact command, return code, stdout/stderr tail, artifact path, and pass/fail status.
 
 ## 5. Close delivery against the repository contract
 
@@ -71,7 +96,28 @@ Before declaring the work complete:
 3. For kernel-affecting changes, derive the exact IR-upload tag syntax from the repository parser, validator, CI, or documented examples. One tag represents one runnable upload matrix item: package, registered kernel, config, test module, and device count. Internal Pallas calls, custom calls, or HLO phases covered by that same item do not each need a tag. Use one tag only when one config/test invocation covers all phases; emit multiple tags for distinct matrix items.
 4. Include the exact tag or tags in the handoff, even when no PR is being opened.
 5. Inspect `.github/workflows`, pre-commit, Ruff, typing, and test configuration; run every applicable project-native CI command. Treat a missing required tool or an unexecuted applicable CI surface as blocked, not silently skipped.
-6. Leave the worktree uncommitted unless the user separately and explicitly authorizes a commit. For implementation changes, draft a message from `assets/commit_message_template.txt`, fill `type[SCOPE]`, `Task`, `Solution`, and exact `Test` evidence, and include IR-upload tags in a `Test` bullet when required. Use `JIRA: COMPIL-XXXX` only as a placeholder and explicitly remind the user to replace it. Validate the draft with the delivery gate. Drafting text never authorizes `git commit`, push, or PR creation.
+6. Leave the worktree uncommitted unless the user separately and explicitly authorizes a commit. For implementation changes, draft a message from `assets/commit_message_template.txt` with the exact sections below; do not invent a free-form format:
+
+   ```text
+   feat[TOOL]: <imperative summary>
+
+   Task:
+   - <task>
+
+   Solution:
+   - <solution>
+
+   Test:
+   - <exact command and result>
+
+   JIRA: COMPIL-XXXX
+   ```
+
+   Include the mandatory acceptance commands in `Test` bullets. Do not put the IR-upload tag
+   in the commit message; report it separately in the delivery handoff/PR metadata. Use
+   `JIRA: COMPIL-XXXX` only as a placeholder and explicitly remind the user to replace it.
+   Validate the draft with the delivery gate. Drafting text never authorizes `git commit`, push,
+   or PR creation.
 
 The handoff must include the delivery ledger, exact CPU and accelerator commands, local CI results, tag decisions, the validated commit-message draft with a JIRA reminder, and whether the worktree remains uncommitted.
 
