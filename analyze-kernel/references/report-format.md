@@ -1,79 +1,79 @@
-# Kernel Analysis Report Format
+# Kernel 分析报告格式
 
-Use this template when assembling the final report in Phase 5.
+报告默认使用中文。代码符号、文件路径、命令、metric/event 名称保持原文。
 
 ```markdown
-# <Kernel Name> Analysis Report
-Generated: <date>
-Device: <TPU model>
+# <Kernel 名称> 性能分析报告
 
-## 1. Computation Flow
-- **Kernel**: <function name> from <module>
-- **Description**: <what the kernel computes>
-- **Grid**: <grid shape> — <meaning of each axis>
-- **Key parameters**: <block_size, fuse_heads, etc.>
-- **Optimizations**: <list of techniques identified>
-- **Matmul inventory**:
+## 1. 结论摘要
 
-  | # | Operation | Shape (M,K)@(K,N) | Per-call FLOPs | Calls/cell | Total FLOPs | AI (FLOP/byte) | Bound |
-  |---|-----------|-------------------|----------------|------------|-------------|----------------|-------|
-  | 1 | ... | ... | ... | ... | ... | ... | ... |
+- 当前结论：accepted / rejected / investigating。
+- 当前瓶颈：compute/MXU / HBM / VMEM / communication / launch-control / mixed。
+- 是否可声明性能收益：是 / 否，以及原因。
 
-- **Total theoretical FLOPs**: X.XX TFLOP
-- **FLOP cross-check**: XLA cost_analysis on JAX reference reports X.XX TFLOP (match / X% discrepancy)
+## 2. Kernel 合约
 
-## 2. Correctness
+| 项目 | 内容 |
+| --- | --- |
+| 函数 | <module.function> |
+| 语义 | <operator semantics> |
+| 输入输出 | <shape, dtype, layout> |
+| mask/padding | <rules> |
+| reference | <trusted reference> |
 
-| Test Shape | cos_sim | max_diff | Status |
-|------------|---------|----------|--------|
-| ... | ... | ... | PASS/MARGINAL/FAIL |
+## 3. Correctness 状态
 
-- **Reference**: <function used>
-- **Threshold**: cos > 0.9999 = PASS, > 0.99 = MARGINAL, else FAIL
+| Shape | 校验项 | Tolerance | 状态 | Artifact |
+| --- | --- | --- | --- | --- |
 
-## 3. Efficiency
+## 4. Benchmark 摘要
 
-### Timing
+| 实验 | Shape | Baseline median | Target median | Speedup | std/p95 | Artifact |
+| --- | --- | --- | --- | --- | --- | --- |
 
-| Config | min (ms) | median (ms) | mean (ms) | std (ms) | p5 (ms) | p95 (ms) |
-|--------|----------|-------------|-----------|----------|---------|----------|
-| ... | ... | ... | ... | ... | ... | ... |
+说明 benchmark 口径：warmup、iters、计时方式、是否同设备同配置。
 
-### Speedup vs Baselines
+## 5. XProf / Device Timing
 
-| Config | This kernel (ms) | Baseline (ms) | Speedup |
-|--------|-------------------|---------------|---------|
-| ... | ... | ... | ... |
+| 组件 | 时间/占比 | 证据 | 解读 |
+| --- | --- | --- | --- |
+| full device time | | | |
+| Pallas custom-call | | | |
+| collective start/done | | | |
+| copy/reshape/transpose | | | |
+| fusion/control | | | |
+| HBM/DMA | | | |
+| VMEM spill/fill | | | |
 
-## 4. Hardware Utilization
+## 6. FLOPs / Bytes / MFU 模型
 
-| Metric | Value |
-|--------|-------|
-| Theoretical FLOPs | X.XX TFLOP |
-| Device time (xplane) | X.XX ms |
-| Achieved TFLOPS | X.X |
-| Peak TFLOPS | 946.7 (TPU v6e bf16) |
-| **MXU utilization** | **X.X%** |
+| 指标 | 手算值 | profiler 值 | 是否可信 | 说明 |
+| --- | --- | --- | --- | --- |
 
-## 5. Bottleneck Analysis
-- **Dominant cost**: <which matmul or operation>
-- **Bottleneck type**: <compute-bound / memory-bound / non-matmul overhead>
-- **Non-matmul overhead**: ~X.X ms (X% of total)
-- **Per-matmul breakdown**:
+必须区分 useful FLOPs、executed FLOPs、XProf-reported FLOPs。
 
-  | Matmul | Shape | AI (FLOP/byte) | Bound | % of FLOPs |
-  |--------|-------|-----------------|-------|------------|
-  | ... | ... | ... | ... | ... |
+## 7. 深度诊断问答
 
-- **Suggested next optimizations**:
-  1. ...
-  2. ...
+- ALU 压力：Vector ALU / Scalar ALU / exp / mask / index 是否过重？
+- MXU 利用率：低利用率是否符合 shape 和 tile 预期？
+- Memory / spill：HBM、VMEM、scratch、copy 是否主导？
+- 通信 overlap：collective 是否暴露，是否和有用计算重叠？
+- Host/device：是否被 host dispatch、launch、control 主导？
 
-## 6. Trace
-- **Trace path**: <path on TPU>
-- **Per-op breakdown** (top 10 by device time):
+## 8. 瓶颈分析
 
-  | Op | Device time (ms) | % of total |
-  |----|------------------|------------|
-  | ... | ... | ... |
+用证据解释瓶颈排序，不要只写直觉。
+
+## 9. 优化假设与决策
+
+| 假设 | 目标指标 | 结果 | 决策 | 下一步 |
+| --- | --- | --- | --- | --- |
+
+## 10. Artifacts
+
+- Correctness:
+- Benchmark:
+- XProf:
+- Performance report:
+- Updated docs:
 ```

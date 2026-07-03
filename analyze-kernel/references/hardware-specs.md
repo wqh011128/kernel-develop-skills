@@ -1,64 +1,65 @@
-# TPU v6e-1 Hardware Specifications
+# TPU v6e-1 硬件与 profiling 参考
 
-Verified via XPlane profiler. Device type: "TPU v6 Lite".
+以下数值来自本地历史 XPlane/profiling 记录。用于估算和交叉验证，不替代当前 profile。
 
-## Compute
+## 1. Compute
 
-| Spec | Value |
-|------|-------|
-| Peak bf16 TFLOPS | 946.7 |
-| Systolic array | 256 × 256 |
-| No MegaCore | — |
+| 项目 | 数值 |
+| --- | --- |
+| Device type | `TPU v6 Lite` |
+| Peak bf16 TFLOPS | `946.7` |
+| Systolic array | `256 x 256` |
+| MegaCore | 无 |
 
-## Memory
+## 2. Memory
 
-| Tier | Capacity | Bandwidth |
-|------|----------|-----------|
-| HBM | 32 GB | 1638 GB/s |
-| VMEM (read) | 32 MB | 23296 GB/s |
-| VMEM (write) | 32 MB | 16128 GB/s |
+| 层级 | 容量 | 带宽 |
+| --- | --- | --- |
+| HBM | `32 GB` | `1638 GB/s` |
+| VMEM read | `32 MB` | `23296 GB/s` |
+| VMEM write | `32 MB` | `16128 GB/s` |
 
-Merged VMEM (no separate accumulator buffer).
+## 3. Roofline 交叉点
 
-## Roofline Crossovers
+| 层级 | Arithmetic intensity 交叉点 |
+| --- | --- |
+| HBM | `578 FLOP/byte` |
+| VMEM | `40.6 FLOP/byte` |
 
-Arithmetic intensity (FLOP/byte) where compute = memory time:
+Pallas kernel 常需要把 VMEM 作为片上访存约束来分析；对每个 matmul/tile 分类时优先使用 VMEM 交叉点，并同时检查 HBM materialization。
 
-| Memory tier | Crossover AI |
-|-------------|-------------|
-| HBM | 578 FLOP/byte |
-| VMEM | 40.6 FLOP/byte |
+## 4. Profiling 口径
 
-Pallas kernels operate from VMEM — use the VMEM crossover (40.6) for per-matmul classification.
+| 方法 | 可信度 | 用途 |
+| --- | --- | --- |
+| xplane `device_duration_ps` | 高 | per-op device timing |
+| calibration matmul + xplane | 高 | 已知 shape 的 MXU% 估算 |
+| 手算 FLOPs | 高 | Pallas custom-call FLOPs 统计缺失时的主口径 |
+| wall clock + `block_until_ready()` | 中 | 快速 benchmark；小 kernel 容易受 host 影响 |
+| XLA `cost_analysis()` | 中 | 标准 JAX 参考；Pallas custom-call 可能为 0 |
+| `trace.json.gz` per-op `dur` | 低/需核对 | 可能反映 host/runtime 而非 device |
+| TC Overlay / HW counters | 当前不稳定 | 历史上 v6e 可能为 0 events |
+| `profiler_client.monitor()` | 当前不稳定 | 可能返回 `UNIMPLEMENTED` |
 
-## Profiling Methods
+## 5. Trace flags
 
-| Method | Reliable? | Use for |
-|--------|-----------|---------|
-| xplane `device_duration_ps` | **Ground truth** | Per-op device timing |
-| Calibration matmuls + xplane | Yes | MXU% for known shapes |
-| Theoretical FLOP counting | Yes | Compute MXU% with xplane time |
-| Wall clock (`block_until_ready`) | >10ms kernels | Quick benchmarks |
-| XLA `cost_analysis()` | Standard JAX only | Cross-check FLOPs (reports 0 for Pallas custom-call) |
-| `trace.json.gz` per-op `dur` | **Broken** | Host dispatch time, not device |
-| TC Overlay / HW counters | **Broken on v6e** | 0 events always |
-| `profiler_client.monitor()` | **Broken** | Returns UNIMPLEMENTED |
+启动 Python 进程前设置：
 
-## LIBTPU_INIT_ARGS
-
-Always set these env vars **before** process launch for trace capture:
-
-```
+```text
 LIBTPU_INIT_ARGS="--xla_enable_custom_call_region_trace=true --xla_xprof_register_llo_debug_info=true"
 ```
 
-| Flag | Effect |
-|------|--------|
-| `--xla_enable_custom_call_region_trace=true` | Breaks down Pallas custom-call into sub-regions |
-| `--xla_xprof_register_llo_debug_info=true` | Adds low-level debug info to profiler output |
+| Flag | 作用 |
+| --- | --- |
+| `--xla_enable_custom_call_region_trace=true` | 拆分 Pallas custom-call 子区域 |
+| `--xla_xprof_register_llo_debug_info=true` | 注册低层调试信息，便于 profile 归因 |
 
-## XPlane Parsing Notes
+## 6. XPlane 解析注意事项
 
-- `event_metadata` and `stat_metadata` are **map fields** (key → metadata), not repeated fields
-- Access via `.items()` or `[key]`, NOT iteration over the container directly
-- Requires tensorflow: `from tensorflow.tsl.profiler.protobuf import xplane_pb2`
+- `event_metadata` 和 `stat_metadata` 是 map fields。
+- 通过 `.items()` 或 `[key]` 访问，不要把 container 当 repeated field 迭代。
+- 解析 protobuf 通常需要：
+
+```python
+from tensorflow.tsl.profiler.protobuf import xplane_pb2
+```

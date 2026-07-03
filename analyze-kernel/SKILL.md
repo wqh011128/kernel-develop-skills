@@ -5,7 +5,7 @@ description: "Analyze correctness, benchmark performance, manual FLOPs, device t
 
 # Analyze JAX/Pallas Kernel
 
-Use this skill for evidence-based performance analysis. Coordinate with `$profile-pallas-xprof` for profile capture, but keep manual FLOPs and source-level reasoning as the source of truth when XProf counters are incomplete or inconsistent.
+Use this skill for evidence-based performance analysis. Coordinate with `$profile-pallas-xprof` for profile capture, but keep manual FLOPs and source-level reasoning as the source of truth when XProf counters are incomplete or inconsistent. Write generated reports in Chinese by default; keep code identifiers, commands, metric names, and profiler event names unchanged.
 
 ## Required Output Location
 
@@ -31,6 +31,8 @@ Do not write new reports to a top-level `results/reports/` directory.
 10. Propose optimization hypotheses with validation metrics and rejection conditions.
 11. Write the report under `results/performance/`.
 12. Update `docs/results.md` and, if a tuning decision changes, `docs/optimization.md`.
+
+For XProf/Roofline/FLOPs/Bytes/Memory/Trace interpretation, load `references/diagnostic-matrix.md` and use the "phenomenon -> possible causes -> next checks" pattern. Do not jump from a slow median directly to block-size tuning.
 
 ## Required Deep XProf Questions
 

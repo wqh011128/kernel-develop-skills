@@ -56,7 +56,7 @@ If math is uncertain, mark the uncertainty and ask the user or add a validation 
 
 ## Document Writing Contract
 
-All docs must be written in Chinese by default, encoded as UTF-8, and structured for future agents to continue work without reading raw logs first.
+All generated kernel docs must be written in Chinese by default, encoded as UTF-8, and structured for future agents to continue work without reading raw logs first. Keep code identifiers, API names, metric names, file names, commands, and official terms such as `XProf`, `FLOPs`, `LSE`, `HBM`, and `VMEM` unchanged when translating would reduce precision.
 
 Use these rules for every doc:
 
@@ -69,6 +69,7 @@ Keep raw logs out of docs; link artifact paths instead.
 When a result changes, update both the experiment README and the relevant top-level summary doc.
 Do not mix design, results, failure notes, and optimization history in one doc.
 Do not leave mojibake or mixed-language placeholder text in final docs.
+不要写按时间顺序堆叠的流水账。文档必须按目标、合约、证据、决策、下一步组织。
 ```
 
 Apply this per-section writing logic:
@@ -110,170 +111,239 @@ fail-notes.md is for concise reusable pitfalls within this kernel workspace; it 
 `README.md`:
 
 ```text
-Use this structure:
+Use this Chinese structure:
 
-# <kernel> Docs
+# <kernel> 文档索引
 
-## 1. Current Status
+## 1. 当前状态
 current best, correctness status, performance status, active XProf URL/path
 
-## 2. Scope
+## 2. 范围
 in scope, out of scope, hard constraints
 
-## 3. Docs Map
+## 3. 文档地图
 one table mapping each doc to its purpose
 
-## 4. Experiments Index
+## 4. 实验索引
 one table: experiment, status, purpose, key artifact/report
 
-## 5. Current Best / Next Step
+## 5. 当前最佳实现与下一步
 current implementation, why it is current best, next hypothesis
 
-## 6. Legacy / Migration Notes
+## 6. 历史迁移说明
 only if legacy artifacts exist
 ```
 
 `rfc.md`:
 
 ```text
-Write in Chinese. Use this exact structure:
+用中文撰写。使用下面的固定 RFC 结构。RFC 导出到独立 RFC 仓库时使用文件名格式 `<number>-<component>-<short-name>.md`；在 kernel workspace 内仍固定写入 `docs/rfc.md`。
 
-# RFC XXXX: <title>
+# RFC 0000: <RFC 标题>
+
+文件名格式：`<number>-<component>-<short-name>.md`
+
+| 字段 | 内容 |
+| --- | --- |
+| Status | Draft / In Review / Accepted / Rejected / Superseded |
+| Owner | <负责人> |
+| Reviewers | <评审人> |
+| Created | YYYY-MM-DD |
+| Updated | YYYY-MM-DD |
+| Target | <目标版本/里程碑/交付窗口> |
 
 ## 1. Summary
-- current existing capability
-- current missing capability
-- this RFC proposal
-- change boundary
+用 2-4 段说明本 RFC 要解决什么问题、提议新增或修改什么能力、为什么现在需要做，以及实现应贴合哪些现有代码边界或组织边界。
 
-## 2. Problem Statement
-Table columns: work domain, current pain point, business/engineering impact.
+## 2. 问题陈述
+先描述问题本身，不要先描述方案。必须包含下表：
+
+| 工作域 | 现状痛点 | 业务影响 |
+| --- | --- | --- |
+
+然后列出具体问题。
 
 ## 3. Context
-### 3.1 Current behavior / architecture
-### 3.2 Relevant background and constraints
-### 3.3 Technical environment
-### 3.4 Technical positioning
+### 3.1 Current Behavior / Architecture
+说明当前主流程、关键模块职责、数据流、控制流，以及需要继续复用的既有能力。
 
-## 4. Current Status / Progress
-- completed
-- verified
-- not completed
-- high uncertainty
+### 3.2 Relevant Background and Constraints
+列出理解本 RFC 必须知道的背景、依赖、外部系统限制和顺序约束。
 
-## 5. Goals
-### Goal 1
-### Goal 2
+### 3.3 Technical Environment
+列出运行时、依赖版本、包管理/构建工具、测试框架、代码风格和 CI 约束。
 
-## 6. Non-Goals
+### 3.4 Positioning
+给关键概念定边界，并明确这些概念不表示什么，避免 Review 时发生定义争议。
 
-## 7. Proposed Design
-### 7.1 Responsibility matrix
-### 7.2 Core flow
-### 7.3 Configuration interface
-### 7.4 Module design
-### 7.5 Error handling and validation
-### 7.6 Compatibility strategy
+## 4. Goals
+每个 Goal 只描述一个可验收结果。每个目标应包含定位、逻辑或规则、必要时的启用方式，以及验收标准。
 
-## 8. Interfaces / Contracts
+### Goal 1 - <目标名>
+定位：
+逻辑：
+启用方式：
+验收标准：
 
-## 9. Alternatives Considered
+### Goal 2 - <目标名>
+定位：
+规则：
+验收标准：
 
-## 10. Risks / Trade-offs
+### Goal 3 - <兼容性/迁移/稳定性目标>
+定位：
+约束：
 
-## 11. Validation / Testing Plan
+## 5. Non-Goals
+明确本 RFC 不做什么。Non-Goals 必须具体，避免实现阶段范围扩大。
 
-## 12. Rollout / Migration Plan
+## 6. Proposed Design
+### 6.1 Responsibility Matrix
+使用包含 `#`、`职责`、`优先级`、`频率`、`交付物` 的表格。
 
-## 13. Tasks / Ownership
+### 6.2 Flow Design
+描述新流程。优先用短代码块表达控制流，再补充关键约束和设计原则。
 
-## 14. Open Questions
+### 6.3 Configuration / API Design
+列出新增或修改的配置、CLI、环境变量、函数签名或公开接口，并说明优先级与校验规则。
 
-## 15. Decision Log
+### 6.4 Data Model / Core Rules
+描述核心数据结构、转换规则、不变量和状态契约。
+
+### 6.5 Module-Level Changes
+使用包含 `模块`、`变更`、`边界` 的表格。
+
+### 6.6 Compatibility
+说明默认行为、旧配置、旧接口、旧产物格式是否保持兼容，并说明回滚或降级方式。
+
+### 6.7 Observability / Output Artifacts
+列出日志、导出文件、指标、错误信息、调试产物及其路径或接口。
+
+## 7. Interfaces / Contracts
+使用包含 `接口`、`说明`、`Contract` 的表格。
+
+## 8. Alternatives Considered
+每个备选方案都必须包含 Pros、Cons，以及采用或不采用的结论。
+
+## 9. Risks / Trade-offs
+使用包含 `风险`、`影响`、`缓解` 的表格。
+
+## 10. Validation / Testing Plan
+使用包含 `信号`、`成功标准`、`度量方式` 的表格。必要时列出新增测试文件和手动验证命令。
+
+## 11. Rollout / Migration Plan
+使用包含 `阶段`、`动作`、`时间`、`依赖` 的表格。说明迁移策略、启用方式、不兼容配置处理和回滚方式。
+
+## 12. Task Breakdown
+使用包含 `Owner`、`任务域`、`范围`、`交付物` 的表格，并说明任务切分规则。
+
+## 13. Open Questions
+列出需要用户、reviewer 或外部系统确认的未决问题。
+
+## 14. Decision Log
+使用包含 `日期`、`决策`、`决策人`、`备注` 的表格。
 ```
 
-The RFC is the single high-level planning document. Put phases, go/no-go gates, acceptance criteria, rollback/rejection conditions, and ownership in sections 11-15. Do not duplicate them in a separate plan document.
+RFC 是唯一高层计划文档。阶段、go/no-go gates、验收标准、回滚/拒绝条件、owner 和决策历史必须放入第 10-14 节，不要再复制到单独 plan 文档。
 
 `math.md`:
 
 ```text
 Use this structure:
 
-# Math: <kernel>
+# 数学语义：<kernel>
 
-## 1. Symbols And Shapes
-symbol definitions and input/output shapes
+## 1. 语义来源与可信边界
+list source of truth: official docs, papers, repository reference, framework reference such as PyTorch/JAX, and tests.
+state which implementation is the correctness reference.
+state which parts are derived by the agent and must be validated.
+never use the optimized kernel as its own reference.
 
-## 2. Global Semantics
+## 2. 符号与 Shape
+symbol definitions and input/output shapes.
+
+## 3. 全局语义
 complete mathematical formula
 
-## 3. Local / Block / Distributed Semantics
+## 4. 局部 / 分块 / 分布式语义
 partitioning, block equations, rank equations
 
-## 4. Equivalence Proof
+## 5. 等价性证明
 prove global semantics equals local/block/rank semantics
 
-## 5. Masking, Padding, And Boundaries
+## 6. Mask、Padding 与边界
 causal, padding, sequence boundary, invalid element behavior
 
-## 6. Dtype And Numerical Stability
+## 7. Dtype 与数值稳定性
 input dtype, accumulator dtype, LSE/softmax rules, tolerance expectations
 
-## 7. Reference Pseudocode
-minimal executable-style reference logic
+## 8. Reference 伪代码
+minimal executable-style reference logic.
+if PyTorch/JAX/framework semantics are used, describe the extraction or equivalence path.
 
-## 8. Data Flow
+## 9. 数据流
 diagram or stepwise data flow when useful
 
-## 9. Required Edge Cases
+## 10. 必测边界条件
 edge cases that must be tested
 ```
 
 For attention, scan, reduction, or distributed kernels, explicitly prove the equivalence between global semantics and local/block/rank semantics.
 
+Math correctness gate:
+
+```text
+Do not treat math.md as complete unless it answers:
+  What is the source of truth?
+  Is the reference implementation dense/framework/JAX/PyTorch or project-local?
+  How are local/block/rank results merged back to the global formula?
+  Which mask, padding, dtype, accumulation, and LSE/normalization rules are required?
+  Which tests would falsify the derivation?
+```
+
 `results.md`:
 
 ```text
-Use this structure:
+Use this Chinese structure:
 
-# Results: <kernel>
+# 结果汇总：<kernel>
 
-## 1. Current Verdict
+## 1. 当前结论
 accepted current best, rejected paths, and whether performance claims are proven
 
-## 2. Correctness Matrix
+## 2. Correctness 矩阵
 table: experiment, command, shapes, tolerance, status, artifact
 
-## 3. Benchmark Summary
+## 3. Benchmark 摘要
 table: experiment, shape, baseline, target, median, speedup, artifact
 
-## 4. XProf / Analysis Summary
+## 4. XProf / 分析摘要
 local URL, profile path, analysis report, bottleneck class, key component movement
 
-## 5. Current Best
+## 5. 当前最佳实现
 current best implementation and why
 
-## 6. Open Validation Gaps
+## 6. 未关闭的验证缺口
 missing shapes, missing profiles, unproven claims
 ```
 
 `fail-notes.md`:
 
 ```text
-Use this structure:
+Use this Chinese structure:
 
-# Fail Notes: <kernel>
+# 踩坑记录：<kernel>
 
-## 1. Pitfall Index
+## 1. 踩坑索引
 table: pitfall, affected experiment, status, short lesson
 
-## 2. Rejected Directions
+## 2. 已拒绝方向
 one section per rejected direction: hypothesis, evidence, shortest root cause, what not to repeat
 
-## 3. Correctness Failures
+## 3. Correctness 失败
 only understood failures; include symptom, cause, fix
 
-## 4. Reusable Kernel-Specific Lessons
+## 4. 本 kernel 可复用经验
 short lessons useful for this kernel workspace
 ```
 
@@ -282,49 +352,49 @@ Do not paste long raw logs here.
 `impl-notes.md`:
 
 ```text
-Use this structure:
+Use this Chinese structure:
 
-# Implementation Notes: <kernel>
+# 实现记录：<kernel>
 
-## 1. File And API Boundaries
+## 1. 文件与 API 边界
 new files, untouched files, public/experimental APIs
 
-## 2. Data Layout And Dtypes
+## 2. 数据布局与 Dtype
 physical layout, padding, dtype and accumulator choices
 
-## 3. Communication / Kernel Split
+## 3. 通信 / Kernel 分层
 what is done by framework collectives and what is done by Pallas/local kernels
 
-## 4. Implementation Variants
+## 4. 实现变体
 accepted and experimental APIs, status, and integration state
 
-## 5. Known Constraints
+## 5. 已知约束
 hard-coded assumptions, unsupported cases, compile/runtime caveats
 ```
 
 `optimization.md`:
 
 ```text
-Use this structure:
+Use this Chinese structure:
 
-# Optimization: <kernel>
+# 优化记录：<kernel>
 
-## 1. Baseline
+## 1. Baseline 基线
 stable baseline, target shapes, metrics, artifact paths
 
-## 2. Bottleneck Classification
+## 2. 瓶颈分类
 roofline class, XProf evidence, component ranking
 
-## 3. Accepted Optimizations
+## 3. 已接受优化
 one section per accepted change: hypothesis, evidence, decision, retained code path
 
-## 4. Rejected / Neutral Optimizations
+## 4. 已拒绝 / 中性优化
 one section per rejected change: hypothesis, evidence, reason, what not to repeat
 
-## 5. Current Hypothesis Queue
+## 5. 当前假设队列
 ordered next experiments with acceptance and rejection conditions
 
-## 6. Process Notes
+## 6. 流程备注
 experiment process notes that affect next-step thinking
 ```
 

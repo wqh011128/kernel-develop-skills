@@ -1,48 +1,58 @@
-# Attention Kernel Tuning Notes
+# Attention Kernel 调优参考
 
-Use for MHA, MQA, GQA, FlashAttention-style kernels, causal masking, prefix/ring attention, and distributed context-parallel attention.
+用于 MHA、MQA、GQA、FlashAttention 风格 kernel、causal mask、prefix/ring attention、分布式 context-parallel attention。
 
-## Correctness Gates
+## 1. Correctness Gates
 
-- Verify logits masking before optimizing softmax or communication.
-- Validate `lse` or denominator state separately when using online softmax, blockwise merge, ring attention, or partitioned attention.
-- Treat output equality and `lse` equality as separate checks; partitioned merge order can cause small output differences even when normalization is correct.
-- Compare against a trusted dense or framework reference before replacing communication or local cores.
-- Cover edge cases: short sequence, non-multiple block sizes, causal boundary, grouped heads, and padding.
+- 优化 softmax 或通信前，先验证 logits mask。
+- 使用 online softmax、blockwise merge、ring attention、partitioned attention 时，必须单独验证 `lse` 或 denominator state。
+- output equality 和 `lse` equality 是两类检查；partitioned merge order 可能让 output 有小差异，但 normalization 必须正确。
+- 替换通信或 local core 前，必须对齐可信 dense/framework reference。
+- 覆盖短序列、非整除 block、causal boundary、grouped heads、padding。
 
-## Bottleneck Patterns
+## 2. Bottleneck Patterns
 
-- Separate local attention compute, softmax merge, reshape/copy, and collective time in profiles.
-- Do not assume less communicated data improves wall time; extra loop/control/merge overhead can dominate.
-- For distributed attention, profile full device time and collectives, not only the Pallas custom-call.
-- For small kernels, prefer device/profile timing over host wall-clock timing.
-- For ring or prefix attention, count useful visible shard work separately from invalid/future shard local-core work.
-- If MXU utilization is low, check whether the kernel is dominated by online-softmax exp, mask/index arithmetic, vector ALU, scalar ALU, spills, or launch/control overhead before changing matmul tiles.
-- For communication overlap, compare collective start/done timing against local-core windows and report whether communication is exposed or hidden.
-- For causal CP attention, a lower collective count is not sufficient; verify that `collective-permute-done`, fusion/control, and slice/reshape overhead did not grow.
-- Use official XProf roofline/overview-style evidence to classify the kernel before choosing a tactic: compute/MXU-bound, HBM-bound, VMEM-bound, communication-bound, launch/control-bound, or mixed.
-- Compare against known high-quality attention implementations or project-local kernels before inventing a new structure. Look for how they handle online softmax state, LSE, masking, layout, and communication boundaries.
-- For block-size tuning, measure full latency and XProf component movement. Larger tiles can reduce launch/control overhead but may increase VMEM pressure or reduce occupancy.
+- 在 profile 中拆分 local attention compute、softmax merge、reshape/copy、collective time。
+- 不要假设通信 bytes 变少就一定更快；额外 loop/control/merge overhead 可能主导。
+- 分布式 attention 必须 profile full device time 和 collectives，不能只看 Pallas custom-call。
+- 小 kernel 优先看 device/profile timing，不只看 host wall-clock。
+- ring/prefix attention 要分开统计 visible shard useful work 和 invalid/future shard local-core work。
+- MXU utilization 低时，先检查 online-softmax exp、mask/index arithmetic、Vector ALU、Scalar ALU、spill、launch/control 是否主导，再改 matmul tile。
+- 通信 overlap 要比较 collective start/done 和 local-core 窗口，明确 exposed 还是 hidden。
+- causal CP attention 中 collective count 降低不够；必须验证 `collective-permute-done`、fusion/control、slice/reshape 没有增长。
+- 先用 XProf/Roofline 证据分类：compute/MXU、HBM、VMEM、communication、launch/control、mixed。
+- 发明新结构前，对比高质量 attention 实现或项目本地 kernel：online softmax state、LSE、mask、layout、communication boundary 如何处理。
+- block-size tuning 必须同时报告 full latency 和 XProf component movement。更大 tile 可能降低 launch/control，但增加 VMEM 压力或降低 occupancy。
 
-## Hypotheses To Test
+## 3. Hypotheses To Test
 
-- Change one of block size, layout, masking strategy, communication pattern, or accumulator precision at a time.
-- Tune query and key/value block sizes with correctness fixed; record both custom-call time and full time.
-- For ring/prefix attention, measure collective latency, merge overhead, and memory materialization separately.
-- Consider fusing merge/update logic only after evidence shows merge/control overhead is material.
-- Test invalid/future-shard skipping only when collective order remains identical on every rank.
-- Treat rank-specialized branches as suspect until XProf proves custom-call time drops without increasing collective or control overhead.
-- When using JAX `lax.cond` or branch functions inside loops, pass loop-derived dynamic scalars such as shard id, global offset, or mask bounds as explicit operands. Do not rely on Python closure capture for correctness-critical branch state.
-- Reject rank-specialized or visible-prefix skipping when full latency regresses, even if it reduces invalid shard work or custom-call count.
-- If HBM-bound, prioritize avoiding K/V materialization, reducing output/LSE intermediates, and improving reuse before tile micro-tuning.
-- If VMEM-bound or spill-heavy, reduce accumulator/state footprint or split state updates.
-- For state compression, validate target block sizes and compiler lowering before claiming an HBM win. A smaller output/state tensor can still increase or fail scoped VMEM due scratch shape, tiling, broadcasting, or lowered temporaries.
-- If launch/control-bound, reduce Pallas call count and JAX-side dynamic control; avoid large `lax.switch` or per-rank branch duplication unless compile cost is proven acceptable.
-- For ring/prefix attention, do not count fewer kernel launches as an optimization if it requires JAX-side K/V materialization, select, gather, or concat. The full latency must include those costs.
-- If communication-bound, optimize exposed collective done/sync time, not just start count or payload size.
+- 一次只改变 block size、layout、masking strategy、communication pattern、accumulator precision 中的一个主变量。
+- 调 query 和 key/value block size 前先固定 correctness；同时记录 custom-call time 和 full time。
+- ring/prefix attention 要分别测 collective latency、merge overhead、memory materialization。
+- 只有证据显示 merge/control overhead 显著时，才尝试 fuse merge/update。
+- invalid/future-shard skipping 只有在所有 rank collective order 完全一致时才可测试。
+- rank-specialized branch 默认可疑，除非 XProf 证明 custom-call 下降且 collective/control 不增长。
+- 在 loop 中使用 JAX `lax.cond` 或 branch function 时，把 shard id、global offset、mask bounds 等 loop-derived dynamic scalar 显式作为 operand 传入，不要依赖 Python closure capture。
+- full latency 回退时拒绝 rank-specialized 或 visible-prefix skipping，即使 invalid shard work 或 custom-call count 下降。
+- HBM-bound 时优先避免 K/V materialization、减少 output/LSE intermediates、提升 reuse，再做 tile micro-tuning。
+- VMEM-bound 或 spill-heavy 时优先减少 accumulator/state footprint 或拆分 state update。
+- state compression 必须验证 target block size 和 compiler lowering。更小的 output/state tensor 仍可能因为 scratch shape、tiling、broadcasting、lowered temporaries 增加或触发 scoped VMEM OOM。
+- launch/control-bound 时减少 Pallas call count 和 JAX-side dynamic control；不要在未证明 compile cost 可接受前引入大型 `lax.switch` 或 per-rank branch duplication。
+- ring/prefix attention 中，如果减少 kernel launch 需要 JAX-side K/V materialization、select、gather、concat，不能直接算作优化；full latency 必须包含这些成本。
+- communication-bound 时优化 exposed collective done/sync time，而不只是 start count 或 payload size。
 
-## Rejection Conditions
+## 4. Rejection Conditions
 
-- Reject an optimization if `lse` correctness regresses, even when output looks close.
-- Reject a communication optimization if collective plus merge overhead erases custom-call gains.
-- Reject layout changes that introduce hidden transposes, reshapes, or HBM copies larger than the saved compute.
+- `lse` correctness 回退时拒绝，即使 output 看起来接近。
+- collective + merge overhead 抹掉 custom-call 收益时拒绝通信优化。
+- hidden transpose、reshape、HBM copy 大于节省计算时拒绝 layout change。
+
+## 5. 指标异常到 Attention 优化方向
+
+| 现象 | 优先怀疑 | 优先验证 |
+| --- | --- | --- |
+| MXU 低但 attention 有 matmul | softmax/mask/vector/control 主导，或 tile 太碎 | Vector/Scalar ALU、exp/reduce fusion、custom-call occurrences |
+| HBM-bound 但 HBM 利用率低 | profiler FLOPs 不完整、materialization、control/communication 暴露 | 手算 FLOPs/Bytes、trace top ops、collective done |
+| ring 慢于 all-gather | ring step、local-core fragmentation、merge/state、communication 未 overlap | local-core count/time、collective start/done、merge/fusion/control |
+| 减少 shard/core 数但 full latency 不降 | JAX-side concat/reorder/select/materialization 抵消收益 | full time、copy/reshape/fusion、HBM/VMEM traffic |
+| output 正确但 `lse` 不稳 | online softmax merge 或 mask/padding 边界错误 | 单独校验 LSE，覆盖 tail/padding/future shard |

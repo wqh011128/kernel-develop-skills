@@ -1,76 +1,68 @@
-# Kernel Analysis Checklist
+# Kernel 分析检查清单
 
-Follow these phases sequentially. Check off items as you complete them.
+按阶段执行。没有完成前置阶段时，不要直接给性能结论。
 
-## Phase 1 — Identify the kernel
+## 阶段 1：确认 Kernel 合约
 
-- [ ] Function name, module path, import statement
-- [ ] Input signature: list all args with shapes and dtypes
-- [ ] `pallas_call` grid shape and `dimension_semantics`
-- [ ] BlockSpec shapes and index_map for each input/output
-- [ ] Static parameters (block_size, num_iterations, etc.)
+- [ ] 函数名、模块路径、导入方式。
+- [ ] 输入输出签名：shape、dtype、layout、sharding。
+- [ ] `pallas_call` grid、`dimension_semantics`、BlockSpec。
+- [ ] 静态参数：block size、num warps/iterations、axis name、通信配置。
+- [ ] mask、padding、边界、dtype promotion、accumulator dtype。
+- [ ] correctness reference：dense/JAX/PyTorch/project-local，不能是待优化 kernel 自身。
 
-## Phase 2 — Build matmul inventory
+## 阶段 2：建立计算与访存模型
 
-- [ ] Find all `jnp.dot()`, `jnp.matmul()`, `@`, `jnp.einsum()` calls in the kernel body
-- [ ] For each matmul: determine input shapes from BlockSpec and variable definitions
-- [ ] Count iterations: `fori_loop(0, N, ...)` → N iterations; python `for` → unrolled count
-- [ ] Count grid cells from `grid=` parameter
-- [ ] Compute per-matmul FLOPs: `2 × M × K × N`
-- [ ] Compute per-matmul arithmetic intensity: `FLOPs / bytes_accessed` (bytes = elements × dtype_bytes for all operands)
-- [ ] Total FLOPs = sum of (per_matmul_FLOPs × iterations × grid_cells)
-- [ ] **Cross-check**: If a pure-JAX reference exists, JIT-compile it and call `compiled.cost_analysis()` → `model_flops`. Compare against manual count. Note discrepancy if any.
-- [ ] Classify each matmul: compute-bound (AI > VMEM crossover of 40.6) or memory-bound
+- [ ] 找出所有 `dot`、`matmul`、`einsum`、reduction、scan、softmax、exp/div、copy/reshape/transpose。
+- [ ] 计算 grid cell 数、循环次数、每类 op 调用次数。
+- [ ] 手算 useful FLOPs 与 executed FLOPs。
+- [ ] 手算 HBM/VMEM bytes、通信 bytes、中间结果读写。
+- [ ] 计算 arithmetic intensity，并区分 HBM / VMEM / communication 口径。
+- [ ] 如果有纯 JAX reference，尝试 `compiled.cost_analysis()` 交叉验证；Pallas custom-call 统计不完整时以手算为主。
 
-## Phase 3 — Identify optimizations
+## 阶段 3：确认 Correctness
 
-Common Pallas kernel optimization techniques to check for:
+- [ ] 先跑小 shape，再跑目标 shape。
+- [ ] 同时校验输出、LSE/denominator/state、mask/padding 边界。
+- [ ] 明确 tolerance，并解释 dtype/accumulation 对 tolerance 的影响。
+- [ ] 分布式 kernel 必须覆盖 rank 边界、future shard、prefix shard、非整除 block。
+- [ ] correctness 失败时停止性能结论。
 
-- [ ] Head fusion / wave pipeline (processing multiple heads per grid cell)
-- [ ] Multi-block KV (processing multiple KV blocks per loop iteration)
-- [ ] Gathered mode (pre-gathering selected data vs loading full arrays)
-- [ ] Online softmax (running max/sum accumulation instead of full softmax)
-- [ ] Fused operations (combining mask computation with attention in one kernel)
-- [ ] Weight absorption (folding projection weights into Q or output path)
-- [ ] Bool-free arithmetic (int32 accumulation + arithmetic conversion instead of bool tensors)
-- [ ] Additive masking (bf16 addition instead of `jnp.where` conditional select)
-- [ ] Custom VJP (separate forward/backward for training support)
-- [ ] Tiling strategy (how the computation is blocked for VMEM capacity)
+## 阶段 4：确认 Benchmark 可信度
 
-## Phase 4 — Correctness test
+- [ ] warmup 至少 5 次，正式迭代至少 20 次，所有结果 `block_until_ready()`。
+- [ ] 报告 min、median、mean、std、p5、p95。
+- [ ] baseline 和 target 必须同 shape、dtype、layout、warmup、iters、设备状态。
+- [ ] 小 kernel 或 sub-ms kernel 优先看 device/profile timing，不只看 host wall-clock。
+- [ ] 单次 sweep 的收益必须 focused repeat 复现后才能接受。
 
-- [ ] Identify a reference implementation (pure JAX, no Pallas) that computes the same output
-- [ ] Generate test data matching the kernel's input signature (use random normal, scale weights by 0.02 for numerical stability)
-- [ ] Test at small shapes first (S=1024, H=8) for fast iteration
-- [ ] Metrics: cos_sim > 0.9999 (PASS), > 0.99 (MARGINAL), < 0.99 (FAIL); also report max_diff
-- [ ] If no reference exists, note this and skip correctness phase
+## 阶段 5：读取 XProf / Trace / XPlane
 
-## Phase 5 — Benchmark
+- [ ] 启动进程前设置：
 
-- [ ] Warmup: 5+ iterations with `block_until_ready()`
-- [ ] Measure: 20+ iterations, record all times
-- [ ] Report: min, median, mean, std, p5, p95 in milliseconds
-- [ ] Run baseline(s) at the same shapes
-- [ ] Compute speedup ratios (use median times)
-- [ ] Note if wall clock is unreliable (kernel < 10ms — host dispatch ~100us dominates)
+```text
+LIBTPU_INIT_ARGS="--xla_enable_custom_call_region_trace=true --xla_xprof_register_llo_debug_info=true"
+```
 
-## Phase 6 — Trace and xplane
+- [ ] 读取 `.xplane.pb` 派生的 device timing。
+- [ ] 读取 `*.trace.json.gz` 或说明不可用原因。
+- [ ] 识别 Pallas custom-call、collective、fusion、copy、reshape、transpose、host/device 分界。
+- [ ] 检查 MXU、Vector ALU、Scalar ALU、Vector Load/Store、HBM/DMA、VMEM spill/fill。
+- [ ] 对通信 kernel，检查 collective start/done 是否被有用计算隐藏。
 
-- [ ] Always set env: `LIBTPU_INIT_ARGS="--xla_enable_custom_call_region_trace=true --xla_xprof_register_llo_debug_info=true"`
-- [ ] Capture trace: warmup 3 → `jax.profiler.start_trace` → 5 iterations → `stop_trace`
-- [ ] Parse xplane.pb for per-op `device_duration_ps`
-- [ ] Identify the Pallas kernel's custom-call op name (e.g., `_lambda_.N`)
-- [ ] Extract its device time (average across trace iterations)
+## 阶段 6：瓶颈分类
 
-## Phase 7 — Hardware analysis
+- [ ] compute/MXU-bound：有足够 FLOPs，MXU/tiling 是主限制。
+- [ ] HBM-bound：HBM bytes 或 materialization 主导。
+- [ ] VMEM-bound：scratch/state/spill/fill 或 scoped VMEM 限制主导。
+- [ ] communication-bound：collective bytes/count/exposed done 主导。
+- [ ] launch/control-bound：custom-call occurrences、host dispatch、JAX control/fusion 主导。
+- [ ] mixed：必须分别说明每个组成项和下一轮希望移动的指标。
 
-- [ ] MXU% = theoretical_FLOPs / (device_time_seconds × peak_TFLOPS × 1e12) × 100
-- [ ] Per-matmul AI classification (compute-bound vs memory-bound using VMEM crossover of 40.6 FLOP/byte)
-- [ ] Estimate non-matmul overhead: total_device_time − (theoretical_FLOPs / peak_TFLOPS)
-- [ ] Identify the dominant bottleneck: largest matmul, memory transfers, non-matmul ops
+## 阶段 7：形成优化假设
 
-## Phase 8 — Report assembly
-
-- [ ] Follow `report-format.md`
-- [ ] Include concrete next-step optimization suggestions based on bottleneck analysis
-- [ ] Save report alongside kernel source or at user-specified location
+- [ ] 一次只改变一个主要变量。
+- [ ] 写清目标指标：full device time、custom-call time、collective exposed time、HBM bytes、VMEM spill、occurrences。
+- [ ] 写清接受条件和拒绝条件。
+- [ ] 先 correctness，再 benchmark，再 XProf。
+- [ ] 更新 experiment README、`docs/results.md`、`docs/optimization.md`。

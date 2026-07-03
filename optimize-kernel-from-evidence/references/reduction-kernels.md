@@ -1,26 +1,30 @@
-# Reduction And Scan Kernel Tuning Notes
+# Reduction / Scan Kernel 调优参考
 
-Use for reductions, prefix scans, normalization, statistics, and online merge states.
+用于 reductions、prefix scans、normalization、statistics、online merge state。
 
-## Correctness Gates
+## 1. Correctness Gates
 
-- Define associativity assumptions and accumulation dtype explicitly.
-- Test non-power-of-two sizes, empty or singleton reductions when supported, and padded tails.
-- For online algorithms, validate intermediate state semantics, not just final output.
+- 明确定义 associativity 假设和 accumulation dtype。
+- 覆盖非 2 的幂、singleton、padding tail、空输入语义。
+- online algorithm 必须验证中间 state，不只看最终 output。
+- 分布式 reduction 要分别验证 local state 和 collective merge。
 
-## Bottleneck Patterns
+## 2. Bottleneck Patterns
 
-- Distinguish arithmetic work from synchronization, memory traffic, and control overhead.
-- Profile whether reduction tree shape, vectorization, or memory layout dominates.
-- For distributed reductions, separate local reduction time from collective time.
+- 区分 arithmetic work、同步、memory traffic、control overhead。
+- 检查 reduction tree shape、vectorization、memory layout 谁主导。
+- 分布式 reduction 要拆分 local reduction time 和 collective time。
+- high vector/scalar time 常来自 mask、index、state update、dtype conversion。
 
-## Hypotheses To Test
+## 3. Hypotheses To Test
 
-- Tune reduction granularity and tree shape while keeping accumulation semantics fixed.
-- Test whether pre-normalization or state compression reduces memory traffic without changing math.
-- Compare local-only, blockwise, and collective variants with identical correctness artifacts.
+- 在 accumulation semantics 不变的前提下调 reduction granularity 和 tree shape。
+- 测试 pre-normalization 或 state compression 是否减少 memory traffic。
+- 比较 local-only、blockwise、collective variants，correctness artifact 必须一致。
+- 如果 state compression 触发 VMEM/spill，回退或做 VMEM-aware redesign。
 
-## Rejection Conditions
+## 4. Rejection Conditions
 
-- Reject changes that rely on non-associative reorderings without documented tolerance.
-- Reject faster reductions if numerical stability or documented edge-case behavior regresses.
+- 未记录 tolerance 的非结合 reorder 直接拒绝。
+- 数值稳定性或边界行为回退时拒绝。
+- local time 下降但 collective/control 抵消 full latency 时拒绝。

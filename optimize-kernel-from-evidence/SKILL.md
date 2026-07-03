@@ -5,7 +5,7 @@ description: "Evidence-driven optimization for JAX/Pallas/TPU/GPU kernels. Use a
 
 # Optimize Kernel From Evidence
 
-Drive optimization from evidence, not intuition. Keep correctness first, change one main variable per iteration, compare against a stable baseline, and record accepted and rejected hypotheses.
+Drive optimization from evidence, not intuition. Keep correctness first, change one main variable per iteration, compare against a stable baseline, and record accepted and rejected hypotheses. Write user-facing reports and generated kernel docs in Chinese by default; keep code identifiers, commands, metric names, and profiler event names unchanged.
 
 ## Required Experiment Layout
 
@@ -45,14 +45,15 @@ If the reference may be wrong, stop and fix the reference first. Never use a pos
 3. Search or inspect consensus sources before inventing a tuning direction when time allows: official framework/backend docs, XProf/Roofline docs, current repo patterns, and high-signal open-source implementations.
 4. Select the relevant kernel-type tuning reference from `references/` when the kernel category is clear.
 5. Classify the current bottleneck with a roofline-style category: compute/MXU-bound, HBM-bound, VMEM/shared-memory-bound, communication-bound, launch/control-bound, or mixed.
-6. Identify baseline and target artifact paths.
-7. Make the smallest code change that tests the hypothesis.
-8. Run correctness before benchmark or profile.
-9. Run benchmark with unchanged measurement policy.
-10. Capture XProf when communication is involved, wall time is small, or results are ambiguous.
-11. Compare full time and component time, not only the optimized custom-call.
-12. Accept, reject, or keep investigating based on predefined metrics.
-13. Update experiment README and top-level docs.
+6. Convert the bottleneck into a phenomenon-driven diagnosis: observed metric, possible causes, next checks, and the one cause this experiment tests.
+7. Identify baseline and target artifact paths.
+8. Make the smallest code change that tests the hypothesis.
+9. Run correctness before benchmark or profile.
+10. Run benchmark with unchanged measurement policy.
+11. Capture XProf when communication is involved, wall time is small, or results are ambiguous.
+12. Compare full time and component time, not only the optimized custom-call.
+13. Accept, reject, or keep investigating based on predefined metrics.
+14. Update experiment README and top-level docs.
 
 Do not combine unrelated changes such as layout, tile size, masking, communication pattern, and dtype policy unless they cannot be separated.
 
@@ -90,6 +91,29 @@ XProf FLOPs or compiler estimates after cross-checking
 ```
 
 If evidence conflicts, record the conflict and add a targeted experiment.
+
+## Metric-To-Hypothesis Discipline
+
+Use a structured diagnosis before changing code:
+
+```text
+Observed phenomenon:
+  the exact metric anomaly, such as full device time >> custom-call time, low MXU, HBM-bound with low HBM utilization, many custom-call occurrences, exposed collective-done, high fusion/control, or VMEM spill/OOM.
+
+Possible causes:
+  list two to five plausible causes. Separate profiler metadata issues from real hardware bottlenecks.
+
+Next checks:
+  name the artifact or measurement that can distinguish the causes: xplane, trace, HLO, manual FLOPs/Bytes, communication bytes, focused repeat, or shape expansion.
+
+Experiment:
+  test one cause only.
+
+Decision:
+  accept only when correctness passes and the intended full-latency/component metric moves in the expected direction.
+```
+
+Do not tune block size, layout, communication, dtype, or fusion solely because the kernel is slow. Tie each change to a measured bottleneck.
 
 ## Roofline-Guided Optimization Classes
 
