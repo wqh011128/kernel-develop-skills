@@ -63,20 +63,13 @@ Ask the user to confirm:
 
 ## Output Format
 
-Reply in Chinese:
+Reply in Chinese. Use this structure:
 
 ```text
-我先确认目标，不开始实现。
-
-已查到的关键信息:
-- ...
-
-需要你确认的最终目标:
-1. ...
-2. ...
-
-默认建议:
-- 如果你没有特别要求，第一版建议先做 ...
+First state that the goal must be confirmed before implementation.
+Then list researched key facts.
+Then ask the user to confirm the final goal checklist.
+Then state default recommendations and their risks.
 ```
 
 If reasonable defaults exist, state them explicitly and explain the risk. If the user says to use defaults, write those defaults into the later design docs.

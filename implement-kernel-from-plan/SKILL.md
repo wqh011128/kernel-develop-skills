@@ -43,11 +43,12 @@ Read the relevant docs first:
 ```text
 docs/rfc.md
 docs/math.md
-docs/develop-plan.md
 docs/results.md, if existing baselines or validation notes exist
 docs/impl-notes.md, if continuing prior implementation
 docs/optimization.md, if continuing tuning
 ```
+
+`docs/rfc.md` is the single high-level planning source. Read its validation plan, rollout/migration plan, tasks/ownership, open questions, and decision log before coding. Do not require or create `docs/develop-plan.md` for new work.
 
 ## Implementation Order
 

@@ -17,7 +17,6 @@ tmp/{kernel_name}_{YYYYMMDD}/
     README.md
     rfc.md
     math.md
-    develop-plan.md
     results.md
     fail-notes.md
     impl-notes.md
@@ -39,6 +38,7 @@ Rules:
 kernel_name: lowercase snake_case.
 method_name: descriptive strategy name, such as all_gather_reference, ring_pallas, tiled_streaming.
 README.md: always uppercase.
+Do not create `develop-plan.md` for new work; `rfc.md` includes the development plan.
 No new top-level results/ directory.
 No old numbered docs such as 00-rfc.md or 03-validation-and-profiling.md.
 ```
@@ -77,6 +77,10 @@ Goal or scope change:
   docs/rfc.md
   docs/README.md
 
+Plan, ownership, rollout, validation strategy, or acceptance gate change:
+  docs/rfc.md
+  docs/optimization.md, only when the change is driven by experimental evidence
+
 Math, mask, dtype, padding, or equivalence change:
   docs/math.md
   docs/impl-notes.md
@@ -94,6 +98,35 @@ Optimization decision:
   docs/results.md
   docs/fail-notes.md, only for concise reusable pitfalls
 ```
+
+## Documentation Quality Contract
+
+Every substantial iteration must keep docs coherent, structured, and evidence-linked:
+
+```text
+README.md:
+  update current status, current best, experiment index, and active XProf/report paths.
+
+rfc.md:
+  update only goal/scope/design/task/decision-log level changes.
+
+math.md:
+  update only when semantics, masking, dtype, padding, or equivalence changes.
+
+results.md:
+  summarize correctness, benchmark, XProf, and current-best evidence; do not paste raw logs.
+
+optimization.md:
+  record hypothesis, bottleneck class, evidence, accept/reject decision, and next hypothesis.
+
+impl-notes.md:
+  record API/file/layout/communication/kernel-boundary changes.
+
+fail-notes.md:
+  record concise root causes and what not to repeat; avoid long failure transcripts.
+```
+
+Use Chinese by default. Keep facts, evidence, decisions, and next actions in separate sections. Prefer tables for matrices and short code blocks for metrics, commands, shapes, and paths. Every performance claim must point to an experiment artifact or XProf/analysis report.
 
 ## Skill Self-Improvement Boundary
 

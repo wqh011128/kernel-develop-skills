@@ -26,9 +26,39 @@ Keep raw profile directories, `.tgz` archives, generated cache files, server log
 5. Print the remote trace directory, shape, dtype, and kernel name.
 6. Tar the remote profile before downloading when practical.
 7. Store downloaded artifacts under `experiments/{method_name}/results/xprof/`.
-8. Generate local XProf cache and start a local server on an available port.
-9. Check that a run is visible.
-10. Update `docs/results.md` and `experiments/{method_name}/README.md`.
+8. Discover a usable local XProf runtime before declaring UI unavailable.
+9. Generate local XProf cache when the local environment has `xprof`; if cache generation fails, still attempt to start the UI from the raw profile when possible.
+10. Start a local XProf server on an available port whenever a local profile exists. Do not silently skip UI startup.
+11. Check that a run is visible.
+12. If raw profile download is slow or fails, keep the remote raw path, parse `*.trace.json.gz` remotely into a small JSON summary, and write `xprof_ui_status.md`.
+13. Update `docs/results.md` and `experiments/{method_name}/README.md`.
+
+## Local XProf Discovery Order
+
+Use this order before reporting that XProf UI cannot be opened:
+
+```text
+1. `where xprof` or `Get-Command xprof`
+2. repository `.venv/Scripts/xprof.exe` on Windows
+3. repository `.venv/bin/xprof` on Linux/macOS
+4. Python environments whose `import xprof` succeeds
+5. explicit `--xprof-exe` path if known from prior runs
+```
+
+If a non-default Python is needed, run the bundled helper with that Python, not system Python.
+
+## Raw Profile Fallback
+
+When a profile exists remotely but cannot be downloaded quickly:
+
+```text
+record remote trace root and tarball path
+record the failed download command and observed behavior
+parse remote `*.trace.json.gz` into a small local JSON summary
+write `results/xprof/xprof_ui_status.md`
+continue the tuning decision only if the summary is sufficient
+do not claim local XProf UI is available
+```
 
 Required environment pattern before importing JAX:
 
@@ -46,19 +76,41 @@ python ~/.codex/skills/profile-pallas-xprof/scripts/xprof_pallas_tools.py api-ch
 
 ## User-Facing Result
 
-Reply in Chinese and include:
+Reply in Chinese. Use a structured result with these fields:
 
 ```text
-local XProf URL
-local profile path
-profile timestamp or run name
-kernel name
-whether the run is visible
-short timing summary, if directly readable
-docs updated
+Conclusion:
+  profile captured/opened, or profile captured but UI failed
+
+XProf UI:
+  local URL
+  server pid or port
+  visible/readiness status
+  if failed: exact missing dependency/error and recovery command
+
+Profile artifacts:
+  local profile path
+  tarball path if available
+  profile timestamp or run name
+  kernel name
+
+Timing summary:
+  short timing summary if directly readable
+
+Docs:
+  docs updated
 ```
 
 If an XProf server is already running and usable, do not restart it unless needed. Report the existing URL and artifact path.
+
+If UI startup fails after a valid profile was downloaded, write a short failure note under `results/xprof/` and still report the raw profile path. Typical failure causes are:
+
+```text
+xprof executable not on PATH
+local Python environment cannot import xprof
+port already occupied
+profile path is incomplete or has no *.xplane.pb
+```
 
 ## Optional Deep Analysis
 
