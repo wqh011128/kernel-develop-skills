@@ -206,6 +206,7 @@ def main() -> None:
         + ", ".join(missing_flags)
     )
 
+
   # LIBTPU_INIT_ARGS is parsed when JAX initializes libtpu. Validate the
   # environment before importing JAX so an actionable gate failure is not
   # replaced by a backend initialization error.

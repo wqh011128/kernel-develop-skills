@@ -14,7 +14,7 @@ python scripts/xprof_workflow.py \
   --config <config> --local-python <python-with-xprof> --port <port>
 ```
 
-Before capture, recheck the remote branch/status, runtime versions, device availability, and applicable `AGENTS.md`. Set required profiling flags before importing JAX. Warm up, trace a deterministic iteration count, synchronize device work, and print shape/dtype/kernel/profile paths.
+Before capture, read the target repository README and use its documented environment setup, then recheck remote branch/status, device availability, and applicable `AGENTS.md`. Do not manually install or upgrade dependencies from this skill. Set required profiling flags before importing JAX. Warm up, trace a deterministic iteration count, synchronize device work, and print shape/dtype/kernel/profile paths.
 
 A successful command is not a successful profile. Require the expected local `.xplane.pb` or explicitly record the remote artifact; verify XProf server readiness and run visibility before reporting an open UI. Keep tarballs, cache, server logs, status, and derived JSON together in the authorized experiment artifact location.
 

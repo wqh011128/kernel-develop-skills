@@ -1,6 +1,6 @@
 # XProf Source Notes for Pallas Custom Calls
 
-Use this reference when validating whether XProf is displaying correct FLOPs for a Pallas custom-call. These notes are derived from `openxla/xprof` source, especially:
+Use this reference when validating whether XProf is displaying correct FLOPs for a Pallas custom-call under the target repository's documented runtime. These notes are derived from `openxla/xprof` source, especially:
 
 - `xprof/convert/xplane_to_tools_data.cc`
 - `xprof/convert/base_op_stats_processor.cc`
@@ -16,12 +16,8 @@ Use the compatible default below for current JAX/libtpu environments:
 LIBTPU_INIT_ARGS="--xla_xprof_register_llo_debug_info=true"
 ```
 
-This flag registers LLO debug information so Trace Viewer can show custom-call
-utilization details. Older environments may also support
-`--xla_enable_custom_call_region_trace=true`, but current libtpu builds can
-reject that flag as unknown and terminate before profiling begins. Treat legacy
-flags as opt-in capabilities: probe them in the target environment before use,
-and never put an unverified flag in the default batch path.
+This is the only profiling flag used by the pinned runtime. Do not add legacy or
+version-dependent flags to the batch path.
 
 ## Programmatic JAX capture
 

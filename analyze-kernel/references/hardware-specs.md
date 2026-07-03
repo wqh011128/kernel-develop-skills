@@ -46,12 +46,11 @@ Pallas kernel 常需要把 VMEM 作为片上访存约束来分析；对每个 ma
 启动 Python 进程前设置：
 
 ```text
-LIBTPU_INIT_ARGS="--xla_enable_custom_call_region_trace=true --xla_xprof_register_llo_debug_info=true"
+LIBTPU_INIT_ARGS="--xla_xprof_register_llo_debug_info=true"
 ```
 
 | Flag | 作用 |
 | --- | --- |
-| `--xla_enable_custom_call_region_trace=true` | 拆分 Pallas custom-call 子区域 |
 | `--xla_xprof_register_llo_debug_info=true` | 注册低层调试信息，便于 profile 归因 |
 
 ## 6. XPlane 解析注意事项

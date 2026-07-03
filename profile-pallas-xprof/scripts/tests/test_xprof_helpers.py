@@ -19,12 +19,10 @@ import xprof_pallas_tools  # noqa: E402
 class XprofHelpersTest(unittest.TestCase):
     def test_default_libtpu_flags_are_current_and_consistent(self) -> None:
         expected = "--xla_xprof_register_llo_debug_info=true"
-        obsolete = "--xla_enable_custom_call_region_trace=true"
         self.assertEqual(pallas_xprof_batch.LIBTPU_FLAGS, expected)
         self.assertEqual(
             pallas_xprof_registry_runner.REQUIRED_LIBTPU_FLAGS, (expected,)
         )
-        self.assertNotIn(obsolete, pallas_xprof_batch.LIBTPU_FLAGS)
 
     def test_failure_classification(self) -> None:
         result = pallas_xprof_batch._classify_failure("No TPU backend")

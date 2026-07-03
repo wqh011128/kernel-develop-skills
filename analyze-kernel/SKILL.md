@@ -7,6 +7,8 @@ description: "Analyze correctness and performance evidence for JAX/Pallas kernel
 
 Analyze only claims supported by available artifacts; do not require XProf for a simple correctness diagnosis or fabricate unavailable counters.
 
+For TPU evidence, first read the target repository README and use its documented environment. Do not infer or override dependency versions in this skill.
+
 1. Confirm semantics, shapes, dtypes, layout/mask/padding, trusted reference, and correctness status.
 2. Verify benchmark comparability: device, shape, dtype, warmup, iterations, synchronization, baseline, and distribution—not a single favorable number.
 3. Build a source-level FLOPs/bytes/communication model when it can distinguish hypotheses. Treat Pallas/XProf FLOPs as untrusted until cross-checked.

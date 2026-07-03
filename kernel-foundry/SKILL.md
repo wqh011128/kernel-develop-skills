@@ -5,6 +5,8 @@ description: "Run an evidence-driven kernel engineering system that turns confir
 
 # Kernel Foundry
 
+Foundry TPU adapters and replay evidence must use the environment documented by the target repository README. Environment setup is outside Foundry; do not install or upgrade dependencies inside an experiment.
+
 Use this skill as the executable learning layer beneath the kernel stage skills. Keep repository rules and operator semantics authoritative; never let the foundry infer either from performance results.
 
 ## Choose the smallest capability

@@ -5,6 +5,8 @@ description: "Test one or more falsifiable JAX/Pallas/TPU/GPU kernel optimizatio
 
 # Kernel Tuning Loop
 
+For TPU experiments, first read the target repository README and use its documented environment before collecting a baseline or accepting a result. Do not install or upgrade dependencies from this skill.
+
 ## Choose one mode
 
 | Mode | Use when | State |

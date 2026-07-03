@@ -8,6 +8,8 @@
 
 远程 kernel 仓库中的 `AGENTS.md`、CI 和项目约定始终是最高权威；本仓库的 skill 不能替代它们。
 
+For TPU work, read the target repository README and use its documented environment setup command. Skills do not install, upgrade, downgrade, or infer dependency versions。
+
 ## 能力结构
 
 | Skill | 职责 | 典型触发 |

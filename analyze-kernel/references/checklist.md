@@ -41,7 +41,7 @@
 - [ ] 启动进程前设置：
 
 ```text
-LIBTPU_INIT_ARGS="--xla_enable_custom_call_region_trace=true --xla_xprof_register_llo_debug_info=true"
+LIBTPU_INIT_ARGS="--xla_xprof_register_llo_debug_info=true"
 ```
 
 - [ ] 读取 `.xplane.pb` 派生的 device timing。
