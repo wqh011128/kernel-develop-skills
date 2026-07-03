@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kernel Design Docs"
+  short_description: "Create kernel RFC, math, plan, validation docs"
+  default_prompt: "Use $kernel-design-docs to create a complete tmp/{kernel_name}_{date}/docs design package for a new kernel."

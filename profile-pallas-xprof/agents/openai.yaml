@@ -1,0 +1,4 @@
+interface:
+  display_name: "Profile Pallas XProf"
+  short_description: "Capture, download, and open TPU XProf traces."
+  default_prompt: "Use $profile-pallas-xprof to capture a remote TPU XProf trace, download it locally, and open the XProf UI."

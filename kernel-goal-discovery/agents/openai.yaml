@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kernel Goal Discovery"
+  short_description: "Clarify kernel goals before implementation"
+  default_prompt: "Use $kernel-goal-discovery to research a requested kernel and ask for the final implementation goal before coding."

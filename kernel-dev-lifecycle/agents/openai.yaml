@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kernel Dev Lifecycle"
+  short_description: "End-to-end kernel development workflow"
+  default_prompt: "Use $kernel-dev-lifecycle to drive a kernel from goal discovery through design, implementation, profiling, and tuning."

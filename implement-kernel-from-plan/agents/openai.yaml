@@ -1,0 +1,4 @@
+interface:
+  display_name: "Implement Kernel From Plan"
+  short_description: "Implement kernels from approved design plans"
+  default_prompt: "Use $implement-kernel-from-plan to implement a kernel only after the approved design and validation plan are available."

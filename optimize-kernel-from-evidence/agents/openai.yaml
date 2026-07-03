@@ -1,0 +1,4 @@
+interface:
+  display_name: "Optimize Kernel From Evidence"
+  short_description: "Use measurements, XProf, and math checks to tune kernels safely."
+  default_prompt: "Use $optimize-kernel-from-evidence to choose, validate, and record the next kernel optimization from correctness tests, benchmark data, XProf traces, and mathematical reasoning."

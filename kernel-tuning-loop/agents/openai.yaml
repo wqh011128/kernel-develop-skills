@@ -1,0 +1,4 @@
+interface:
+  display_name: "Kernel Tuning Loop"
+  short_description: "Iterate correctness, profiling, and tuning"
+  default_prompt: "Use $kernel-tuning-loop to run structured correctness, benchmark, XProf, and tuning iterations for a kernel."
