@@ -17,6 +17,7 @@ Before research or edits:
 4. Treat repository rules as authoritative. Read `references/repository-contract-review.md` only when discovery is unclear.
 5. Build a delivery ledger from every applicable `AGENTS.md` Definition of Done item and every explicit user requirement. Re-read the applicable files after a rebase, branch change, or scope change.
 6. For a fresh checkout, read the target repository README and follow its environment setup command exactly. Do not manually install or upgrade dependencies from this skill.
+7. Resolve one artifact directory before any write: use the user's directory when provided; otherwise use `<target-repository-root>/docs/<kernel>/` (for pallaskernel: `pallaskernel/docs/<kernel>/`). RFCs, design docs, failure records, research state, and experiment artifacts use this directory. Never write them into the skills repository.
 
 No accessible repository contract means no repository edit. Report what could not be inspected.
 
@@ -80,7 +81,7 @@ Every kernel task ends with a learning checkpoint, even when the task succeeds:
 
 1. Scan the task ledger, failed commands, correctness mismatches, performance regressions, blocked checks, and user corrections.
 2. Classify each lesson as `local` (only this kernel), `candidate` (possibly reusable but not proven), or `confirmed` (reproduced root cause, durable evidence, and a passing control).
-3. For `candidate`, write a machine-readable failure record in the experiment artifact directory; do not change shared skills.
+3. For `candidate`, write a machine-readable failure record in the resolved artifact directory; do not change shared skills.
 4. For `confirmed`, use `$kernel-foundry` to promote the record to an executable guardrail, check it on the failing facts and passing control, and add the case to replay evaluation.
 5. Only after replay/eval shows a measurable improvement may a shared skill rule or helper be proposed. Keep the raw failure record, guardrail result, replay result, and proposed diff together.
 

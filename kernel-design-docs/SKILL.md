@@ -7,6 +7,16 @@ description: "为新建或修改的 JAX/Pallas/TPU/GPU kernel 建立最小必要
 
 Document uncertainty and durable decisions, not the entire workflow.
 
+## Artifact destination
+
+Before creating or updating any RFC, design document, failure record, research state, benchmark summary, HLO note, or XProf note, resolve one artifact directory:
+
+1. If the user provides an artifact directory, use that directory for all task artifacts.
+2. Otherwise use `<target-repository-root>/docs/<kernel>/`; for the standard `pallaskernel` checkout this is `pallaskernel/docs/<kernel>/`.
+3. Create the directory only inside the target kernel repository. Never write task artifacts into this skills repository or into a skill's `references/` or `assets/` directory.
+
+Report the resolved absolute artifact directory before writing. Keep RFCs, design notes, failure records, research state, benchmark summaries, HLO notes, and XProf notes together unless the target repository contract explicitly requires separate locations.
+
 ## Select the document surface
 
 | Mode | Default |
